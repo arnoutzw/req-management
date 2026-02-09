@@ -124,7 +124,7 @@ tailwind.config = {
         </button>
       </div>
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="dashStats"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="dashStats"></div>
       <!-- Charts Row -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5">
@@ -190,7 +190,16 @@ tailwind.config = {
             <option value="in_review">Under Review</option>
             <option value="reviewed">Reviewed</option>
             <option value="approved">Approved</option>
+            <option value="implemented">Implemented</option>
+            <option value="verified">Verified</option>
             <option value="rejected">Rejected</option>
+          </select>
+          <select id="wiFilterReqLevel" onchange="renderWorkItems()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="all">All Levels</option>
+            <option value="business">Business</option>
+            <option value="stakeholder">Stakeholder</option>
+            <option value="system">System</option>
+            <option value="software">Software</option>
           </select>
           <select id="wiFilterPriority" onchange="renderWorkItems()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
             <option value="all">All Priorities</option>
@@ -211,6 +220,7 @@ tailwind.config = {
             <tr class="border-b border-zinc-700">
               <th class="text-left font-mono text-zinc-400 px-4 py-3 w-24 cursor-pointer hover:text-amber-400" onclick="sortWorkItems('id')">ID <i data-lucide="arrow-up-down" class="w-3 h-3 inline"></i></th>
               <th class="text-left font-mono text-zinc-400 px-4 py-3 w-20">Type</th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-20">Level</th>
               <th class="text-left font-mono text-zinc-400 px-4 py-3 cursor-pointer hover:text-amber-400" onclick="sortWorkItems('title')">Title <i data-lucide="arrow-up-down" class="w-3 h-3 inline"></i></th>
               <th class="text-left font-mono text-zinc-400 px-4 py-3 w-28">Status</th>
               <th class="text-left font-mono text-zinc-400 px-4 py-3 w-24">Priority</th>
@@ -314,6 +324,70 @@ tailwind.config = {
         <label class="text-xs text-zinc-500 font-mono block mb-1">Description</label>
         <textarea id="wiDescription" rows="4" placeholder="Describe the work item..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
       </div>
+      <!-- ISO 29148 Requirement Fields -->
+      <div id="reqFields" class="hidden space-y-4">
+        <div class="border-t border-zinc-700 pt-4">
+          <div class="text-[10px] font-mono text-amber-400 uppercase tracking-wider mb-3">ISO 29148 Attributes</div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-zinc-500 font-mono block mb-1">Requirement Type</label>
+              <select id="wiReqType" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+                <option value="functional">Functional</option>
+                <option value="performance">Performance</option>
+                <option value="interface">Interface</option>
+                <option value="design_constraint">Design Constraint</option>
+                <option value="security">Security</option>
+                <option value="usability">Usability</option>
+                <option value="reliability">Reliability</option>
+                <option value="maintainability">Maintainability</option>
+                <option value="portability">Portability</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-zinc-500 font-mono block mb-1">Requirement Level</label>
+              <select id="wiReqLevel" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+                <option value="system">System</option>
+                <option value="business">Business</option>
+                <option value="stakeholder">Stakeholder</option>
+                <option value="software">Software</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <label class="text-xs text-zinc-500 font-mono block mb-1">Verification Method</label>
+              <select id="wiVerificationMethod" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+                <option value="">Not specified</option>
+                <option value="inspection">Inspection</option>
+                <option value="test">Test</option>
+                <option value="demonstration">Demonstration</option>
+                <option value="analysis">Analysis</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-zinc-500 font-mono block mb-1">Difficulty</label>
+              <select id="wiDifficulty" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+                <option value="">Not specified</option>
+                <option value="easy">Easy</option>
+                <option value="nominal">Nominal</option>
+                <option value="difficult">Difficult</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-4">
+            <label class="text-xs text-zinc-500 font-mono block mb-1">Source / Origin</label>
+            <input type="text" id="wiSource" placeholder="e.g., Stakeholder interview, regulation, trade study..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none">
+          </div>
+          <div class="mt-4">
+            <label class="text-xs text-zinc-500 font-mono block mb-1">Rationale</label>
+            <textarea id="wiRationale" rows="2" placeholder="Why this requirement is needed..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
+          </div>
+          <div class="mt-4">
+            <label class="text-xs text-zinc-500 font-mono block mb-1">Acceptance Criteria</label>
+            <textarea id="wiAcceptanceCriteria" rows="2" placeholder="Conditions for validating the requirement is met..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
+          </div>
+        </div>
+      </div>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="text-xs text-zinc-500 font-mono block mb-1">Assignee</label>
@@ -360,7 +434,11 @@ tailwind.config = {
       <div>
         <label class="text-xs text-zinc-500 font-mono block mb-1">Type</label>
         <select id="docType" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
-          <option value="srs">System Requirements Specification</option>
+          <option value="brs">Business Requirements Specification (BRS)</option>
+          <option value="strs">Stakeholder Requirements Specification (StRS)</option>
+          <option value="syrs">System Requirements Specification (SyRS)</option>
+          <option value="srs">Software Requirements Specification (SRS)</option>
+          <option value="opscon">Operational Concept (OpsCon)</option>
           <option value="sds">System Design Specification</option>
           <option value="tp">Test Plan</option>
           <option value="vp">Verification Procedures</option>
@@ -387,14 +465,34 @@ tailwind.config = {
       <div>
         <label class="text-xs text-zinc-500 font-mono block mb-1">Link Role</label>
         <select id="linkRole" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
-          <option value="parent">Parent of</option>
-          <option value="child">Child of</option>
-          <option value="verifies">Verifies</option>
-          <option value="verified_by">Verified by</option>
-          <option value="implements">Implements</option>
-          <option value="implemented_by">Implemented by</option>
-          <option value="relates_to">Relates to</option>
-          <option value="depends_on">Depends on</option>
+          <optgroup label="Hierarchy">
+            <option value="parent">Parent of</option>
+            <option value="child">Child of</option>
+          </optgroup>
+          <optgroup label="ISO 29148 Traceability">
+            <option value="satisfies">Satisfies</option>
+            <option value="satisfied_by">Satisfied by</option>
+            <option value="derives_from">Derives from</option>
+            <option value="derived">Derived</option>
+          </optgroup>
+          <optgroup label="Verification &amp; Validation">
+            <option value="verifies">Verifies</option>
+            <option value="verified_by">Verified by</option>
+            <option value="validates">Validates</option>
+            <option value="validated_by">Validated by</option>
+          </optgroup>
+          <optgroup label="Implementation">
+            <option value="implements">Implements</option>
+            <option value="implemented_by">Implemented by</option>
+          </optgroup>
+          <optgroup label="Risk">
+            <option value="mitigates">Mitigates</option>
+            <option value="mitigated_by">Mitigated by</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="relates_to">Relates to</option>
+            <option value="depends_on">Depends on</option>
+          </optgroup>
         </select>
       </div>
       <div>
@@ -421,6 +519,8 @@ tailwind.config = {
 <!-- ===== JAVASCRIPT ===== -->
 <script>
 // ========================== DATA MODEL ==========================
+// Aligned with ISO/IEC/IEEE 29148:2018
+
 const TYPES = {
   requirement: { label: 'Requirement', short: 'REQ', color: 'blue', icon: 'file-check' },
   testcase:    { label: 'Test Case',   short: 'TC',  color: 'green', icon: 'test-tubes' },
@@ -429,12 +529,63 @@ const TYPES = {
   defect:      { label: 'Defect',      short: 'DEF', color: 'red', icon: 'bug' }
 };
 
+// ISO 29148 Clause 5.2 — Requirement classification by type
+const REQ_TYPES = {
+  functional:        { label: 'Functional',        color: 'blue' },
+  performance:       { label: 'Performance',       color: 'cyan' },
+  interface:         { label: 'Interface',         color: 'indigo' },
+  design_constraint: { label: 'Design Constraint', color: 'violet' },
+  security:          { label: 'Security',          color: 'red' },
+  usability:         { label: 'Usability',         color: 'green' },
+  reliability:       { label: 'Reliability',       color: 'orange' },
+  maintainability:   { label: 'Maintainability',   color: 'teal' },
+  portability:       { label: 'Portability',       color: 'slate' }
+};
+
+// ISO 29148 — Requirement hierarchy levels (V-model alignment)
+const REQ_LEVELS = {
+  business:    { label: 'Business',    color: 'purple', docType: 'brs' },
+  stakeholder: { label: 'Stakeholder', color: 'indigo', docType: 'strs' },
+  system:      { label: 'System',      color: 'blue',   docType: 'syrs' },
+  software:    { label: 'Software',    color: 'cyan',   docType: 'srs' }
+};
+
+// ISO 29148 Clause 5.2.8 — Verification methods (ITDA)
+const VERIFICATION_METHODS = {
+  inspection:    { label: 'Inspection' },
+  test:          { label: 'Test' },
+  demonstration: { label: 'Demonstration' },
+  analysis:      { label: 'Analysis' }
+};
+
+// ISO 29148 Clause 5.2.8 — Difficulty attribute
+const DIFFICULTIES = {
+  easy:    { label: 'Easy',    color: 'green' },
+  nominal: { label: 'Nominal', color: 'amber' },
+  difficult: { label: 'Difficult', color: 'red' }
+};
+
+// ISO 29148 Clause 5.2.4 — Nine individual quality characteristics
+const QUALITY_CHARS = [
+  { key: 'necessary',   label: 'Necessary',   tip: 'Defines an essential capability; removal creates a deficiency' },
+  { key: 'appropriate', label: 'Appropriate',  tip: 'Detail level is appropriate; avoids unnecessary design constraints' },
+  { key: 'unambiguous', label: 'Unambiguous',  tip: 'Can be interpreted in only one way' },
+  { key: 'complete',    label: 'Complete',     tip: 'Sufficiently describes the capability without needing other information' },
+  { key: 'singular',    label: 'Singular',     tip: 'States a single capability (not compound)' },
+  { key: 'feasible',    label: 'Feasible',     tip: 'Can be realized within cost, schedule, and technical constraints' },
+  { key: 'verifiable',  label: 'Verifiable',   tip: 'Has means to prove the system satisfies it' },
+  { key: 'correct',     label: 'Correct',      tip: 'Accurately represents the entity need it was derived from' },
+  { key: 'conforming',  label: 'Conforming',   tip: 'Conforms to the approved requirement template and style' }
+];
+
 const STATUSES = {
-  draft:     { label: 'Draft',        color: 'zinc',   next: ['in_review'] },
-  in_review: { label: 'Under Review', color: 'amber',  next: ['reviewed', 'rejected'] },
-  reviewed:  { label: 'Reviewed',     color: 'blue',   next: ['approved', 'rejected', 'draft'] },
-  approved:  { label: 'Approved',     color: 'green',  next: ['draft'] },
-  rejected:  { label: 'Rejected',     color: 'red',    next: ['draft'] }
+  draft:       { label: 'Draft',        color: 'zinc',   next: ['in_review'] },
+  in_review:   { label: 'Under Review', color: 'amber',  next: ['reviewed', 'rejected'] },
+  reviewed:    { label: 'Reviewed',     color: 'blue',   next: ['approved', 'rejected', 'draft'] },
+  approved:    { label: 'Approved',     color: 'green',  next: ['implemented', 'draft'] },
+  implemented: { label: 'Implemented',  color: 'cyan',   next: ['verified', 'approved'] },
+  verified:    { label: 'Verified',     color: 'emerald', next: ['approved'] },
+  rejected:    { label: 'Rejected',     color: 'red',    next: ['draft'] }
 };
 
 const PRIORITIES = {
@@ -444,16 +595,25 @@ const PRIORITIES = {
   low:      { label: 'Low',      color: 'zinc' }
 };
 
+// ISO 29148 — Traceability link types (bidirectional)
 const LINK_ROLES = {
-  parent:         { label: 'Parent of',      reverse: 'child' },
-  child:          { label: 'Child of',        reverse: 'parent' },
-  verifies:       { label: 'Verifies',        reverse: 'verified_by' },
-  verified_by:    { label: 'Verified by',     reverse: 'verifies' },
-  implements:     { label: 'Implements',      reverse: 'implemented_by' },
-  implemented_by: { label: 'Implemented by',  reverse: 'implements' },
-  relates_to:     { label: 'Relates to',      reverse: 'relates_to' },
-  depends_on:     { label: 'Depends on',      reverse: 'depended_by' },
-  depended_by:    { label: 'Depended by',     reverse: 'depends_on' }
+  parent:         { label: 'Parent of',       reverse: 'child' },
+  child:          { label: 'Child of',         reverse: 'parent' },
+  satisfies:      { label: 'Satisfies',        reverse: 'satisfied_by' },
+  satisfied_by:   { label: 'Satisfied by',     reverse: 'satisfies' },
+  derives_from:   { label: 'Derives from',     reverse: 'derived' },
+  derived:        { label: 'Derived',          reverse: 'derives_from' },
+  verifies:       { label: 'Verifies',         reverse: 'verified_by' },
+  verified_by:    { label: 'Verified by',      reverse: 'verifies' },
+  validates:      { label: 'Validates',        reverse: 'validated_by' },
+  validated_by:   { label: 'Validated by',     reverse: 'validates' },
+  implements:     { label: 'Implements',       reverse: 'implemented_by' },
+  implemented_by: { label: 'Implemented by',   reverse: 'implements' },
+  mitigates:      { label: 'Mitigates',        reverse: 'mitigated_by' },
+  mitigated_by:   { label: 'Mitigated by',     reverse: 'mitigates' },
+  relates_to:     { label: 'Relates to',       reverse: 'relates_to' },
+  depends_on:     { label: 'Depends on',       reverse: 'depended_by' },
+  depended_by:    { label: 'Depended by',      reverse: 'depends_on' }
 };
 
 // ========================== STATE ==========================
@@ -587,17 +747,27 @@ function refreshAll() {
 // ========================== DASHBOARD ==========================
 function renderDashboard() {
   const items = getProjectItems();
+  const reqs = items.filter(i => i.type === 'requirement');
   const statsEl = document.getElementById('dashStats');
   const total = items.length;
   const approved = items.filter(i=>i.status==='approved').length;
-  const inReview = items.filter(i=>i.status==='in_review').length;
+  const verified = items.filter(i=>i.status==='verified').length;
   const coverage = total > 0 ? Math.round((items.filter(i => getLinksFor(i.id).length > 0).length / total) * 100) : 0;
+  // ISO 29148 quality compliance: % of requirements with all 9 quality characteristics checked
+  const qualityCompliant = reqs.length > 0 ? Math.round((reqs.filter(r => {
+    const qc = r.qualityChars || {};
+    return QUALITY_CHARS.every(c => qc[c.key]);
+  }).length / reqs.length) * 100) : 0;
+  // Verification method coverage: % of requirements with a verification method assigned
+  const verifMethodCoverage = reqs.length > 0 ? Math.round((reqs.filter(r => r.verificationMethod).length / reqs.length) * 100) : 0;
 
   statsEl.innerHTML = [
     { label: 'Total Items', value: total, icon: 'layers', color: 'amber' },
-    { label: 'Approved', value: approved, icon: 'check-circle', color: 'green' },
-    { label: 'Under Review', value: inReview, icon: 'clock', color: 'amber' },
-    { label: 'Trace Coverage', value: coverage + '%', icon: 'link', color: 'blue' }
+    { label: 'Approved / Verified', value: `${approved} / ${verified}`, icon: 'check-circle', color: 'green' },
+    { label: 'Trace Coverage', value: coverage + '%', icon: 'link', color: 'blue' },
+    { label: 'Quality Compliance', value: qualityCompliant + '%', icon: 'shield-check', color: 'emerald', sub: 'ISO 29148' },
+    { label: 'Verif. Method Assigned', value: verifMethodCoverage + '%', icon: 'clipboard-check', color: 'cyan', sub: 'ITDA Coverage' },
+    { label: 'Requirements', value: reqs.length, icon: 'file-check', color: 'blue', sub: Object.keys(REQ_LEVELS).map(l => `${(reqs.filter(r=>r.reqLevel===l).length)} ${REQ_LEVELS[l].label}`).filter(s=>!s.startsWith('0')).join(', ') || 'None' }
   ].map(s => `
     <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5 hover:border-amber-500/50 transition-all duration-300">
       <div class="flex items-center justify-between mb-3">
@@ -605,6 +775,7 @@ function renderDashboard() {
         <i data-lucide="${s.icon}" class="w-4 h-4 text-${s.color}-400"></i>
       </div>
       <div class="font-mono font-bold text-2xl text-zinc-100">${s.value}</div>
+      ${s.sub ? `<div class="text-[10px] font-mono text-zinc-600 mt-1">${s.sub}</div>` : ''}
     </div>`).join('');
 
   // Render charts with simple canvas bars
@@ -635,7 +806,7 @@ function renderStatusChart(items) {
   const counts = Object.keys(STATUSES).map(s => ({ key: s, label: STATUSES[s].label, count: items.filter(i=>i.status===s).length }));
   const max = Math.max(...counts.map(c=>c.count), 1);
   const barW = Math.min(60, (w - 40) / counts.length - 10);
-  const colors = { draft: '#71717a', in_review: '#f59e0b', reviewed: '#60a5fa', approved: '#34d399', rejected: '#f87171' };
+  const colors = { draft: '#71717a', in_review: '#f59e0b', reviewed: '#60a5fa', approved: '#34d399', implemented: '#22d3ee', verified: '#6ee7b7', rejected: '#f87171' };
 
   counts.forEach((c, i) => {
     const x = 20 + i * ((w - 40) / counts.length) + ((w - 40) / counts.length - barW) / 2;
@@ -693,10 +864,18 @@ function openNewWorkItemModal(type) {
   document.getElementById('wiAssignee').value = '';
   document.getElementById('wiTestSteps').value = '';
   document.getElementById('wiExpectedResult').value = '';
+  // ISO 29148 fields
+  document.getElementById('wiReqType').value = 'functional';
+  document.getElementById('wiReqLevel').value = 'system';
+  document.getElementById('wiVerificationMethod').value = '';
+  document.getElementById('wiDifficulty').value = '';
+  document.getElementById('wiSource').value = '';
+  document.getElementById('wiRationale').value = '';
+  document.getElementById('wiAcceptanceCriteria').value = '';
   populateDocSelect();
-  toggleTestCaseFields();
+  toggleTypeFields();
   document.getElementById('wiModal').classList.remove('hidden');
-  document.getElementById('wiType').addEventListener('change', toggleTestCaseFields);
+  document.getElementById('wiType').addEventListener('change', toggleTypeFields);
 }
 
 function populateDocSelect() {
@@ -704,9 +883,12 @@ function populateDocSelect() {
   sel.innerHTML = '<option value="">None</option>' + getProjectDocs().map(d => `<option value="${d.id}">${esc(d.title)}</option>`).join('');
 }
 
-function toggleTestCaseFields() {
-  document.getElementById('testCaseFields').classList.toggle('hidden', document.getElementById('wiType').value !== 'testcase');
+function toggleTypeFields() {
+  const type = document.getElementById('wiType').value;
+  document.getElementById('testCaseFields').classList.toggle('hidden', type !== 'testcase');
+  document.getElementById('reqFields').classList.toggle('hidden', type !== 'requirement');
 }
+function toggleTestCaseFields() { toggleTypeFields(); }
 
 function closeWIModal() { document.getElementById('wiModal').classList.add('hidden'); }
 
@@ -721,6 +903,18 @@ function saveWorkItem() {
 
   if (!title) { toast('Title is required', 'error'); return; }
 
+  // Collect ISO 29148 requirement attributes
+  const reqAttrs = {};
+  if (type === 'requirement') {
+    reqAttrs.reqType = document.getElementById('wiReqType').value;
+    reqAttrs.reqLevel = document.getElementById('wiReqLevel').value;
+    reqAttrs.verificationMethod = document.getElementById('wiVerificationMethod').value;
+    reqAttrs.difficulty = document.getElementById('wiDifficulty').value;
+    reqAttrs.source = document.getElementById('wiSource').value.trim();
+    reqAttrs.rationale = document.getElementById('wiRationale').value.trim();
+    reqAttrs.acceptanceCriteria = document.getElementById('wiAcceptanceCriteria').value.trim();
+  }
+
   if (editId) {
     const wi = state.workItems.find(w => w.id === editId);
     if (wi) {
@@ -730,6 +924,10 @@ function saveWorkItem() {
       if (type === 'testcase') {
         wi.testSteps = document.getElementById('wiTestSteps').value;
         wi.expectedResult = document.getElementById('wiExpectedResult').value;
+      }
+      if (type === 'requirement') {
+        Object.assign(wi, reqAttrs);
+        if (!wi.qualityChars) wi.qualityChars = {};
       }
       logActivity('updated', wi.id, `Updated ${TYPES[type].short}-${wi.numId}: "${title}"`);
       toast('Work item updated');
@@ -751,6 +949,10 @@ function saveWorkItem() {
     if (type === 'testcase') {
       wi.testSteps = document.getElementById('wiTestSteps').value;
       wi.expectedResult = document.getElementById('wiExpectedResult').value;
+    }
+    if (type === 'requirement') {
+      Object.assign(wi, reqAttrs);
+      wi.qualityChars = {};
     }
     state.workItems.push(wi);
     logActivity('created', wi.id, `Created ${wi.id}: "${title}"`);
@@ -774,9 +976,17 @@ function editWorkItem(id) {
   document.getElementById('wiAssignee').value = wi.assignee || '';
   document.getElementById('wiTestSteps').value = wi.testSteps || '';
   document.getElementById('wiExpectedResult').value = wi.expectedResult || '';
+  // ISO 29148 fields
+  document.getElementById('wiReqType').value = wi.reqType || 'functional';
+  document.getElementById('wiReqLevel').value = wi.reqLevel || 'system';
+  document.getElementById('wiVerificationMethod').value = wi.verificationMethod || '';
+  document.getElementById('wiDifficulty').value = wi.difficulty || '';
+  document.getElementById('wiSource').value = wi.source || '';
+  document.getElementById('wiRationale').value = wi.rationale || '';
+  document.getElementById('wiAcceptanceCriteria').value = wi.acceptanceCriteria || '';
   populateDocSelect();
   document.getElementById('wiDocument').value = wi.documentId || '';
-  toggleTestCaseFields();
+  toggleTypeFields();
   document.getElementById('wiModal').classList.remove('hidden');
 }
 
@@ -809,12 +1019,14 @@ function renderWorkItems() {
   const filterType = document.getElementById('wiFilterType')?.value || 'all';
   const filterStatus = document.getElementById('wiFilterStatus')?.value || 'all';
   const filterPriority = document.getElementById('wiFilterPriority')?.value || 'all';
+  const filterReqLevel = document.getElementById('wiFilterReqLevel')?.value || 'all';
 
   let items = getProjectItems();
   if (filterType !== 'all') items = items.filter(i => i.type === filterType);
   if (state.currentFilter !== 'all') items = items.filter(i => i.type === state.currentFilter);
   if (filterStatus !== 'all') items = items.filter(i => i.status === filterStatus);
   if (filterPriority !== 'all') items = items.filter(i => i.priority === filterPriority);
+  if (filterReqLevel !== 'all') items = items.filter(i => i.reqLevel === filterReqLevel);
 
   items.sort((a, b) => {
     let va = a[state.sortField], vb = b[state.sortField];
@@ -831,10 +1043,12 @@ function renderWorkItems() {
     const s = STATUSES[wi.status];
     const p = PRIORITIES[wi.priority];
     const linkCount = getLinksFor(wi.id).length;
+    const rl = wi.reqLevel ? REQ_LEVELS[wi.reqLevel] : null;
     return `
     <tr class="border-b border-zinc-800 hover:bg-zinc-900/80 cursor-pointer transition-colors" onclick="openDetailFlyout('${wi.id}')">
       <td class="px-4 py-3 font-mono text-amber-400 text-xs">${wi.id}</td>
       <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span></td>
+      <td class="px-4 py-3">${rl ? `<span class="text-[10px] px-1.5 py-0.5 bg-${rl.color}-500/10 text-${rl.color}-400 rounded font-mono">${rl.label}</span>` : '<span class="text-zinc-600 text-[10px] font-mono">—</span>'}</td>
       <td class="px-4 py-3 text-zinc-100 font-medium">${esc(wi.title)}</td>
       <td class="px-4 py-3"><span class="flex items-center gap-1.5"><span class="status-dot bg-${s.color}-400"></span><span class="text-xs font-mono text-${s.color}-400">${s.label}</span></span></td>
       <td class="px-4 py-3"><span class="text-xs font-mono text-${p.color}-400">${p.label}</span></td>
@@ -848,7 +1062,7 @@ function renderWorkItems() {
         </div>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="text-center py-12 text-zinc-600 font-mono">No work items found. Create one to get started.</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="text-center py-12 text-zinc-600 font-mono">No work items found. Create one to get started.</td></tr>';
 
   lucide.createIcons();
 }
@@ -918,6 +1132,58 @@ function openDetailFlyout(id) {
           <span class="text-xs font-mono text-zinc-400">${timeAgo(wi.updated)}</span>
         </div>
       </div>
+
+      ${wi.type === 'requirement' ? `
+      <!-- ISO 29148 Requirement Attributes -->
+      <div class="border border-amber-500/20 rounded-lg p-4 bg-amber-500/5">
+        <div class="text-[10px] font-mono text-amber-400 uppercase tracking-wider mb-3">ISO 29148 Attributes</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-zinc-800 rounded-lg p-3">
+            <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Req. Type</div>
+            <span class="text-xs font-mono text-${(REQ_TYPES[wi.reqType]||{}).color||'zinc'}-400">${(REQ_TYPES[wi.reqType]||{}).label||'Not set'}</span>
+          </div>
+          <div class="bg-zinc-800 rounded-lg p-3">
+            <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Req. Level</div>
+            <span class="text-xs font-mono text-${(REQ_LEVELS[wi.reqLevel]||{}).color||'zinc'}-400">${(REQ_LEVELS[wi.reqLevel]||{}).label||'Not set'}</span>
+          </div>
+          <div class="bg-zinc-800 rounded-lg p-3">
+            <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Verification</div>
+            <span class="text-xs font-mono text-zinc-300">${(VERIFICATION_METHODS[wi.verificationMethod]||{}).label||'Not specified'}</span>
+          </div>
+          <div class="bg-zinc-800 rounded-lg p-3">
+            <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Difficulty</div>
+            <span class="text-xs font-mono text-${(DIFFICULTIES[wi.difficulty]||{}).color||'zinc'}-400">${(DIFFICULTIES[wi.difficulty]||{}).label||'Not specified'}</span>
+          </div>
+        </div>
+        <div class="mt-3 bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Source / Origin</div>
+          <div class="text-xs text-zinc-300">${esc(wi.source || 'Not specified')}</div>
+        </div>
+        <div class="mt-2 bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Rationale</div>
+          <div class="text-xs text-zinc-300 whitespace-pre-wrap">${esc(wi.rationale || 'Not specified')}</div>
+        </div>
+        <div class="mt-2 bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Acceptance Criteria</div>
+          <div class="text-xs text-zinc-300 whitespace-pre-wrap">${esc(wi.acceptanceCriteria || 'Not specified')}</div>
+        </div>
+      </div>
+
+      <!-- ISO 29148 Quality Characteristics Checklist -->
+      <div class="border border-zinc-700 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase">Quality Characteristics (ISO 29148 Cl. 5.2.4)</div>
+          <span class="text-[10px] font-mono text-amber-400">${QUALITY_CHARS.filter(qc => (wi.qualityChars||{})[qc.key]).length}/${QUALITY_CHARS.length}</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          ${QUALITY_CHARS.map(qc => `
+            <label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800 cursor-pointer transition-colors group" title="${qc.tip}">
+              <input type="checkbox" ${(wi.qualityChars||{})[qc.key]?'checked':''} onchange="toggleQualityChar('${wi.id}','${qc.key}',this.checked)" class="accent-amber-500 w-3.5 h-3.5">
+              <span class="text-[11px] font-mono text-zinc-400 group-hover:text-zinc-200">${qc.label}</span>
+            </label>`).join('')}
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Description -->
       <div>
@@ -1013,6 +1279,19 @@ function addComment(wiId) {
   wi.comments.push({ author: 'You', text, time: new Date().toISOString() });
   wi.updated = new Date().toISOString();
   logActivity('comment', wiId, `Commented on ${wiId}`);
+  saveState();
+  openDetailFlyout(wiId);
+}
+
+// ========================== ISO 29148 QUALITY CHARACTERISTICS ==========================
+function toggleQualityChar(wiId, charKey, checked) {
+  const wi = state.workItems.find(w => w.id === wiId);
+  if (!wi) return;
+  if (!wi.qualityChars) wi.qualityChars = {};
+  wi.qualityChars[charKey] = checked;
+  wi.updated = new Date().toISOString();
+  wi.history = wi.history || [];
+  wi.history.push({ action: 'quality_update', time: new Date().toISOString(), details: `Quality characteristic "${charKey}" ${checked ? 'met' : 'unmet'}` });
   saveState();
   openDetailFlyout(wiId);
 }
@@ -1257,7 +1536,7 @@ function openDocument(docId) {
   if (!doc) return;
   state.currentDocId = docId;
 
-  const docTypes = { srs: 'System Requirements Specification', sds: 'System Design Specification', tp: 'Test Plan', vp: 'Verification Procedures', generic: 'Generic Document' };
+  const docTypes = { brs: 'Business Requirements Specification', strs: 'Stakeholder Requirements Specification', syrs: 'System Requirements Specification', srs: 'Software Requirements Specification', opscon: 'Operational Concept', sds: 'System Design Specification', tp: 'Test Plan', vp: 'Verification Procedures', generic: 'Generic Document' };
   const editor = document.getElementById('docEditor');
   const docItems = getProjectItems().filter(wi => wi.documentId === docId);
 
@@ -1466,9 +1745,12 @@ function handleGlobalSearch(query) {
     const s = STATUSES[wi.status];
     const p = PRIORITIES[wi.priority];
     return `
+    const rl = wi.reqLevel ? REQ_LEVELS[wi.reqLevel] : null;
+    return `
     <tr class="border-b border-zinc-800 hover:bg-zinc-900/80 cursor-pointer transition-colors" onclick="openDetailFlyout('${wi.id}')">
       <td class="px-4 py-3 font-mono text-amber-400 text-xs">${wi.id}</td>
       <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span></td>
+      <td class="px-4 py-3">${rl ? `<span class="text-[10px] px-1.5 py-0.5 bg-${rl.color}-500/10 text-${rl.color}-400 rounded font-mono">${rl.label}</span>` : '<span class="text-zinc-600 text-[10px] font-mono">—</span>'}</td>
       <td class="px-4 py-3 text-zinc-100">${esc(wi.title)}</td>
       <td class="px-4 py-3"><span class="flex items-center gap-1.5"><span class="status-dot bg-${s.color}-400"></span><span class="text-xs font-mono text-${s.color}-400">${s.label}</span></span></td>
       <td class="px-4 py-3"><span class="text-xs font-mono text-${p.color}-400">${p.label}</span></td>
@@ -1476,7 +1758,7 @@ function handleGlobalSearch(query) {
       <td class="px-4 py-3"><span class="text-xs font-mono text-zinc-600">${getLinksFor(wi.id).length}</span></td>
       <td class="px-4 py-3"></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="text-center py-8 text-zinc-600 font-mono">No results found</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="text-center py-8 text-zinc-600 font-mono">No results found</td></tr>';
 
   lucide.createIcons();
 }
@@ -1515,12 +1797,18 @@ function seedDemoData() {
   if (state.workItems.length > 0) return;
 
   const reqs = [
-    { title: 'System shall authenticate users via SSO', priority: 'critical', desc: 'The system must support single sign-on authentication using SAML 2.0 or OpenID Connect protocols.' },
-    { title: 'System shall support role-based access control', priority: 'high', desc: 'Define and enforce user roles: Admin, Manager, Engineer, Viewer with granular permissions.' },
-    { title: 'System shall log all data modifications', priority: 'high', desc: 'Every create, update, and delete operation must be captured in an immutable audit trail.' },
-    { title: 'Response time shall not exceed 2 seconds', priority: 'medium', desc: 'All API endpoints must respond within 2000ms under normal load conditions.' },
-    { title: 'System shall support data export in CSV and PDF', priority: 'low', desc: 'Users can export filtered work item lists and reports in CSV and PDF format.' },
-    { title: 'System shall encrypt data at rest using AES-256', priority: 'critical', desc: 'All stored data including backups must be encrypted using AES-256 encryption.' }
+    { title: 'System shall authenticate users via SSO', priority: 'critical', desc: 'The system shall support single sign-on authentication using SAML 2.0 or OpenID Connect protocols.',
+      reqType: 'functional', reqLevel: 'system', source: 'Security Architecture Review', rationale: 'Enterprise SSO reduces credential sprawl and aligns with corporate identity policy.', verificationMethod: 'demonstration', difficulty: 'difficult', acceptanceCriteria: 'User successfully authenticates via SAML 2.0 IdP and is granted a session token within 3 seconds.', qualityChars: { necessary: true, unambiguous: true, complete: true, singular: true, verifiable: true, correct: true, conforming: true } },
+    { title: 'System shall support role-based access control', priority: 'high', desc: 'The system shall define and enforce user roles: Admin, Manager, Engineer, Viewer with granular permissions.',
+      reqType: 'security', reqLevel: 'system', source: 'Stakeholder Interview — CISO', rationale: 'Granular RBAC is required to enforce least-privilege access per organizational security policy.', verificationMethod: 'test', difficulty: 'nominal', acceptanceCriteria: 'Each role has distinct permission boundaries; unauthorized actions return 403 Forbidden.', qualityChars: { necessary: true, appropriate: true, unambiguous: true, complete: true, singular: true, feasible: true, verifiable: true, correct: true, conforming: true } },
+    { title: 'System shall log all data modifications', priority: 'high', desc: 'Every create, update, and delete operation shall be captured in an immutable audit trail.',
+      reqType: 'functional', reqLevel: 'system', source: 'Regulatory Compliance (SOC 2)', rationale: 'Immutable audit logging is required for SOC 2 Type II compliance and incident investigation.', verificationMethod: 'test', difficulty: 'nominal', acceptanceCriteria: 'All CRUD operations produce timestamped audit entries that cannot be modified or deleted.', qualityChars: { necessary: true, unambiguous: true, complete: true, singular: true, verifiable: true } },
+    { title: 'Response time shall not exceed 2 seconds', priority: 'medium', desc: 'All API endpoints shall respond within 2000ms under normal load conditions (up to 500 concurrent users).',
+      reqType: 'performance', reqLevel: 'system', source: 'Performance Engineering Trade Study', rationale: 'Sub-2-second response ensures acceptable user experience per industry benchmarks.', verificationMethod: 'test', difficulty: 'nominal', acceptanceCriteria: 'P95 latency < 2000ms with 500 concurrent users under synthetic load test.', qualityChars: { necessary: true, appropriate: true, unambiguous: true, singular: true, feasible: true, verifiable: true } },
+    { title: 'System shall support data export in CSV and PDF', priority: 'low', desc: 'The system shall allow users to export filtered work item lists and reports in CSV and PDF format.',
+      reqType: 'functional', reqLevel: 'software', source: 'User Story Workshop', rationale: 'Export capability enables offline reporting and integration with external tools.', verificationMethod: 'demonstration', difficulty: 'easy', acceptanceCriteria: 'User exports data; CSV opens correctly in Excel; PDF renders with proper formatting.', qualityChars: { necessary: true, unambiguous: true, singular: true, verifiable: true } },
+    { title: 'System shall encrypt data at rest using AES-256', priority: 'critical', desc: 'All stored data including backups shall be encrypted using AES-256 encryption.',
+      reqType: 'security', reqLevel: 'system', source: 'Security Policy — Data Protection Standard', rationale: 'AES-256 encryption at rest is mandated by corporate data protection policy and GDPR requirements.', verificationMethod: 'inspection', difficulty: 'nominal', acceptanceCriteria: 'All database volumes and backup archives use AES-256; verified via infrastructure audit.', qualityChars: { necessary: true, appropriate: true, unambiguous: true, complete: true, singular: true, feasible: true, verifiable: true, correct: true, conforming: true } }
   ];
 
   const tcs = [
@@ -1541,6 +1829,13 @@ function seedDemoData() {
       status: i < 2 ? 'approved' : i < 4 ? 'in_review' : 'draft',
       assignee: ['Alice', 'Bob', 'Charlie'][i % 3],
       project: state.currentProject, documentId: '',
+      // ISO 29148 attributes
+      reqType: r.reqType, reqLevel: r.reqLevel,
+      source: r.source, rationale: r.rationale,
+      verificationMethod: r.verificationMethod,
+      difficulty: r.difficulty,
+      acceptanceCriteria: r.acceptanceCriteria,
+      qualityChars: r.qualityChars || {},
       created: new Date(Date.now() - (6-i)*86400000).toISOString(),
       updated: new Date(Date.now() - (6-i)*3600000).toISOString(),
       comments: [], history: [{ action: 'created', time: new Date().toISOString(), details: 'Work item created' }]
@@ -1586,7 +1881,7 @@ function seedDemoData() {
 
   // Create a document
   state.documents.push({
-    id: 'DOC-1', title: 'System Requirements Specification', type: 'srs',
+    id: 'DOC-1', title: 'System Requirements Specification', type: 'syrs',
     project: state.currentProject,
     sections: [
       { id: 'sec1', title: '1. Introduction', content: 'This document specifies the system-level requirements for the ReqForge platform.', workItems: ['REQ-1', 'REQ-2'] },
@@ -1630,7 +1925,7 @@ function init() {
   });
 
   // Type selector change handler
-  document.getElementById('wiType')?.addEventListener('change', toggleTestCaseFields);
+  document.getElementById('wiType')?.addEventListener('change', toggleTypeFields);
 }
 
 init();
