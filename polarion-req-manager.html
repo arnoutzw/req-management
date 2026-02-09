@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReqForge — Requirements Management</title>
+<meta name="description" content="Professional Requirements Management PWA">
+<meta name="theme-color" content="#09090b">
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUmVxRm9yZ2UiLCJzaG9ydF9uYW1lIjoiUmVxRm9yZ2UiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzA5MDkwYiIsInRoZW1lX2NvbG9yIjoiIzA5MDkwYiIsImljb25zIjpbXX0=">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace']
+      }
+    }
+  }
+}
+</script>
+<style>
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #18181b; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+* { box-sizing: border-box; }
+[contenteditable]:focus { outline: 1px solid #f59e0b; border-radius: 4px; }
+.view-hidden { display: none !important; }
+.tree-children { padding-left: 1.5rem; }
+.tree-node.collapsed > .tree-children { display: none; }
+.matrix-cell { min-width: 36px; min-height: 36px; }
+.drag-over { outline: 2px dashed #f59e0b; outline-offset: -2px; }
+.toast { animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s; }
+@keyframes slideIn { from { transform: translateX(100%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+@keyframes fadeOut { from { opacity:1; } to { opacity:0; } }
+.sidebar-item.active { background: rgba(245,158,11,0.1); color: #fbbf24; border-right: 2px solid #f59e0b; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; }
+</style>
+</head>
+<body class="bg-zinc-950 text-zinc-300 font-sans text-sm h-screen flex flex-col overflow-hidden">
+
+<!-- ===== TOP HEADER BAR ===== -->
+<header class="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-800 flex items-center h-12 px-4 gap-3 shrink-0">
+  <div class="flex items-center gap-2">
+    <div class="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
+      <i data-lucide="shield-check" class="w-4 h-4 text-zinc-900"></i>
+    </div>
+    <span class="font-mono font-bold text-amber-500 text-base tracking-tight">ReqForge</span>
+  </div>
+  <div class="h-5 w-px bg-zinc-700 mx-1"></div>
+  <!-- Project Selector -->
+  <div class="relative" id="projectSelectorWrap">
+    <button onclick="toggleProjectDropdown()" class="flex items-center gap-1.5 text-zinc-300 hover:text-amber-400 font-mono text-xs px-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors">
+      <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+      <span id="currentProjectName">Default Project</span>
+      <i data-lucide="chevron-down" class="w-3 h-3"></i>
+    </button>
+    <div id="projectDropdown" class="hidden absolute top-8 left-0 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl w-56 z-50 py-1"></div>
+  </div>
+  <div class="flex-1"></div>
+  <!-- Search -->
+  <div class="relative w-72">
+    <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+    <input id="globalSearch" type="text" placeholder="Search work items..."
+      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-9 pr-3 py-1.5 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none"
+      oninput="handleGlobalSearch(this.value)">
+  </div>
+  <button onclick="showNotifications()" class="relative text-zinc-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
+    <i data-lucide="bell" class="w-4 h-4"></i>
+    <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">0</span>
+  </button>
+  <div class="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 font-mono font-bold text-xs">A</div>
+</header>
+
+<!-- ===== MAIN LAYOUT ===== -->
+<div class="flex flex-1 overflow-hidden">
+  <!-- SIDEBAR -->
+  <nav id="sidebar" class="w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0 overflow-y-auto">
+    <div class="p-3 space-y-0.5">
+      <button onclick="switchView('dashboard')" class="sidebar-item active w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-mono hover:bg-zinc-800 transition-colors" data-view="dashboard">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+      </button>
+      <button onclick="switchView('documents')" class="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-mono hover:bg-zinc-800 transition-colors" data-view="documents">
+        <i data-lucide="file-text" class="w-4 h-4"></i> Documents
+      </button>
+      <button onclick="switchView('workitems')" class="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-mono hover:bg-zinc-800 transition-colors" data-view="workitems">
+        <i data-lucide="list-checks" class="w-4 h-4"></i> Work Items
+      </button>
+      <button onclick="switchView('tree')" class="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-mono hover:bg-zinc-800 transition-colors" data-view="tree">
+        <i data-lucide="git-branch" class="w-4 h-4"></i> Tree View
+      </button>
+      <button onclick="switchView('matrix')" class="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-mono hover:bg-zinc-800 transition-colors" data-view="matrix">
+        <i data-lucide="grid-3x3" class="w-4 h-4"></i> Traceability
+      </button>
+      <button onclick="switchView('baselines')" class="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-mono hover:bg-zinc-800 transition-colors" data-view="baselines">
+        <i data-lucide="bookmark" class="w-4 h-4"></i> Baselines
+      </button>
+    </div>
+    <div class="border-t border-zinc-800 p-3 mt-auto">
+      <div class="text-[10px] font-mono text-zinc-600 mb-2 uppercase tracking-wider">Quick Filters</div>
+      <button onclick="filterByType('all')" class="w-full text-left px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors">All Types</button>
+      <button onclick="filterByType('requirement')" class="w-full text-left px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center gap-2"><span class="status-dot bg-blue-400"></span>Requirements</button>
+      <button onclick="filterByType('testcase')" class="w-full text-left px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center gap-2"><span class="status-dot bg-green-400"></span>Test Cases</button>
+      <button onclick="filterByType('task')" class="w-full text-left px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center gap-2"><span class="status-dot bg-amber-400"></span>Tasks</button>
+      <button onclick="filterByType('changerequest')" class="w-full text-left px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center gap-2"><span class="status-dot bg-purple-400"></span>Change Requests</button>
+      <button onclick="filterByType('defect')" class="w-full text-left px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center gap-2"><span class="status-dot bg-red-400"></span>Defects</button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main id="mainContent" class="flex-1 overflow-y-auto">
+
+    <!-- ===== DASHBOARD VIEW ===== -->
+    <div id="view-dashboard" class="p-6 space-y-6">
+      <div class="flex items-center justify-between">
+        <h1 class="font-mono font-bold text-amber-500 text-xl">Dashboard</h1>
+        <button onclick="openNewWorkItemModal()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2">
+          <i data-lucide="plus" class="w-4 h-4"></i> New Work Item
+        </button>
+      </div>
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="dashStats"></div>
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5">
+          <h3 class="font-mono font-bold text-zinc-100 text-sm mb-4">Items by Status</h3>
+          <canvas id="statusChart" height="200"></canvas>
+        </div>
+        <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5">
+          <h3 class="font-mono font-bold text-zinc-100 text-sm mb-4">Items by Type</h3>
+          <canvas id="typeChart" height="200"></canvas>
+        </div>
+      </div>
+      <!-- Recent Activity -->
+      <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5">
+        <h3 class="font-mono font-bold text-zinc-100 text-sm mb-4">Recent Activity</h3>
+        <div id="recentActivity" class="space-y-2 max-h-64 overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <!-- ===== DOCUMENTS VIEW ===== -->
+    <div id="view-documents" class="view-hidden h-full flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+        <h1 class="font-mono font-bold text-amber-500 text-xl">Documents</h1>
+        <button onclick="openNewDocModal()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2">
+          <i data-lucide="file-plus" class="w-4 h-4"></i> New Document
+        </button>
+      </div>
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Doc sidebar -->
+        <div class="w-64 border-r border-zinc-800 overflow-y-auto p-3 bg-zinc-900/50" id="docSidebar"></div>
+        <!-- Doc editor -->
+        <div class="flex-1 overflow-y-auto p-6" id="docEditor">
+          <div class="flex items-center justify-center h-full text-zinc-500 font-mono text-sm">
+            <div class="text-center">
+              <i data-lucide="file-text" class="w-12 h-12 mx-auto mb-3 text-zinc-600"></i>
+              <p>Select a document or create a new one</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WORK ITEMS TABLE VIEW ===== -->
+    <div id="view-workitems" class="view-hidden h-full flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+        <div class="flex items-center gap-3">
+          <h1 class="font-mono font-bold text-amber-500 text-xl">Work Items</h1>
+          <div class="flex gap-1">
+            <button onclick="setWISubView('table')" class="text-xs font-mono px-2 py-1 rounded tab-active" id="tabTable">Table</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="wiFilterType" onchange="renderWorkItems()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="all">All Types</option>
+            <option value="requirement">Requirements</option>
+            <option value="testcase">Test Cases</option>
+            <option value="task">Tasks</option>
+            <option value="changerequest">Change Requests</option>
+            <option value="defect">Defects</option>
+          </select>
+          <select id="wiFilterStatus" onchange="renderWorkItems()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="all">All Statuses</option>
+            <option value="draft">Draft</option>
+            <option value="in_review">Under Review</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <select id="wiFilterPriority" onchange="renderWorkItems()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="all">All Priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <button onclick="openNewWorkItemModal()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i> New
+          </button>
+        </div>
+      </div>
+      <!-- Table -->
+      <div class="flex-1 overflow-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-zinc-900 sticky top-0 z-10">
+            <tr class="border-b border-zinc-700">
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-24 cursor-pointer hover:text-amber-400" onclick="sortWorkItems('id')">ID <i data-lucide="arrow-up-down" class="w-3 h-3 inline"></i></th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-20">Type</th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 cursor-pointer hover:text-amber-400" onclick="sortWorkItems('title')">Title <i data-lucide="arrow-up-down" class="w-3 h-3 inline"></i></th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-28">Status</th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-24">Priority</th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-28 cursor-pointer hover:text-amber-400" onclick="sortWorkItems('updated')">Updated <i data-lucide="arrow-up-down" class="w-3 h-3 inline"></i></th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-16">Links</th>
+              <th class="text-left font-mono text-zinc-400 px-4 py-3 w-20">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="wiTableBody"></tbody>
+        </table>
+      </div>
+      <!-- Detail Panel -->
+      <div id="wiDetailPanel" class="hidden border-t border-zinc-700 h-80 overflow-y-auto bg-zinc-900/50"></div>
+    </div>
+
+    <!-- ===== TREE VIEW ===== -->
+    <div id="view-tree" class="view-hidden h-full flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+        <h1 class="font-mono font-bold text-amber-500 text-xl">Tree View</h1>
+        <div class="flex items-center gap-2">
+          <button onclick="expandAllTree()" class="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-mono px-3 py-1.5 rounded-lg transition-colors">Expand All</button>
+          <button onclick="collapseAllTree()" class="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-mono px-3 py-1.5 rounded-lg transition-colors">Collapse All</button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-4" id="treeContainer"></div>
+    </div>
+
+    <!-- ===== TRACEABILITY MATRIX ===== -->
+    <div id="view-matrix" class="view-hidden h-full flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+        <h1 class="font-mono font-bold text-amber-500 text-xl">Traceability Matrix</h1>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-mono text-zinc-400">Rows:</label>
+          <select id="matrixRowType" onchange="renderMatrix()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="requirement">Requirements</option>
+            <option value="testcase">Test Cases</option>
+            <option value="task">Tasks</option>
+          </select>
+          <label class="text-xs font-mono text-zinc-400">Cols:</label>
+          <select id="matrixColType" onchange="renderMatrix()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="testcase">Test Cases</option>
+            <option value="requirement">Requirements</option>
+            <option value="task">Tasks</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-4" id="matrixContainer"></div>
+    </div>
+
+    <!-- ===== BASELINES VIEW ===== -->
+    <div id="view-baselines" class="view-hidden h-full flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+        <h1 class="font-mono font-bold text-amber-500 text-xl">Baselines</h1>
+        <button onclick="createBaseline()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2">
+          <i data-lucide="bookmark-plus" class="w-4 h-4"></i> Create Baseline
+        </button>
+      </div>
+      <div class="flex-1 overflow-auto p-4 space-y-3" id="baselinesContainer"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- New/Edit Work Item Modal -->
+<div id="wiModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-zinc-700">
+      <h2 class="font-mono font-bold text-zinc-100 text-base" id="wiModalTitle">New Work Item</h2>
+      <button onclick="closeWIModal()" class="text-zinc-400 hover:text-amber-400 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="wiEditId">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-zinc-500 font-mono block mb-1">Type</label>
+          <select id="wiType" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="requirement">Requirement</option>
+            <option value="testcase">Test Case</option>
+            <option value="task">Task</option>
+            <option value="changerequest">Change Request</option>
+            <option value="defect">Defect</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-zinc-500 font-mono block mb-1">Priority</label>
+          <select id="wiPriority" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="medium">Medium</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-zinc-500 font-mono block mb-1">Title</label>
+        <input type="text" id="wiTitle" placeholder="Enter work item title..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="text-xs text-zinc-500 font-mono block mb-1">Description</label>
+        <textarea id="wiDescription" rows="4" placeholder="Describe the work item..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-zinc-500 font-mono block mb-1">Assignee</label>
+          <input type="text" id="wiAssignee" placeholder="Name..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="text-xs text-zinc-500 font-mono block mb-1">Document</label>
+          <select id="wiDocument" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+            <option value="">None</option>
+          </select>
+        </div>
+      </div>
+      <!-- Custom Fields for Test Cases -->
+      <div id="testCaseFields" class="hidden space-y-4">
+        <div>
+          <label class="text-xs text-zinc-500 font-mono block mb-1">Test Steps</label>
+          <textarea id="wiTestSteps" rows="3" placeholder="1. Step one&#10;2. Step two..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
+        </div>
+        <div>
+          <label class="text-xs text-zinc-500 font-mono block mb-1">Expected Result</label>
+          <textarea id="wiExpectedResult" rows="2" placeholder="Expected outcome..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none resize-none"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 p-5 border-t border-zinc-700">
+      <button onclick="closeWIModal()" class="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-mono px-4 py-2.5 rounded-lg transition-colors">Cancel</button>
+      <button onclick="saveWorkItem()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2.5 rounded-lg text-xs transition-colors">Save Work Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Document Modal -->
+<div id="docModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-zinc-700">
+      <h2 class="font-mono font-bold text-zinc-100 text-base">New Document</h2>
+      <button onclick="closeDocModal()" class="text-zinc-400 hover:text-amber-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div>
+        <label class="text-xs text-zinc-500 font-mono block mb-1">Title</label>
+        <input type="text" id="docTitle" placeholder="Document title..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="text-xs text-zinc-500 font-mono block mb-1">Type</label>
+        <select id="docType" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+          <option value="srs">System Requirements Specification</option>
+          <option value="sds">System Design Specification</option>
+          <option value="tp">Test Plan</option>
+          <option value="vp">Verification Procedures</option>
+          <option value="generic">Generic Document</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 p-5 border-t border-zinc-700">
+      <button onclick="closeDocModal()" class="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-mono px-4 py-2.5 rounded-lg">Cancel</button>
+      <button onclick="saveDocument()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2.5 rounded-lg text-xs">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Link Work Item Modal -->
+<div id="linkModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-zinc-700">
+      <h2 class="font-mono font-bold text-zinc-100 text-base">Link Work Items</h2>
+      <button onclick="closeLinkModal()" class="text-zinc-400 hover:text-amber-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="linkSourceId">
+      <div>
+        <label class="text-xs text-zinc-500 font-mono block mb-1">Link Role</label>
+        <select id="linkRole" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
+          <option value="parent">Parent of</option>
+          <option value="child">Child of</option>
+          <option value="verifies">Verifies</option>
+          <option value="verified_by">Verified by</option>
+          <option value="implements">Implements</option>
+          <option value="implemented_by">Implemented by</option>
+          <option value="relates_to">Relates to</option>
+          <option value="depends_on">Depends on</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-zinc-500 font-mono block mb-1">Target Work Item</label>
+        <select id="linkTarget" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none"></select>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 p-5 border-t border-zinc-700">
+      <button onclick="closeLinkModal()" class="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-mono px-4 py-2.5 rounded-lg">Cancel</button>
+      <button onclick="saveLink()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2.5 rounded-lg text-xs">Create Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- Work Item Detail Flyout -->
+<div id="detailFlyout" class="hidden fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-zinc-900 border-l border-zinc-700 shadow-2xl overflow-y-auto">
+  <div id="detailFlyoutContent"></div>
+</div>
+<div id="detailOverlay" class="hidden fixed inset-0 z-40 bg-black/60" onclick="closeDetailFlyout()"></div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+// ========================== DATA MODEL ==========================
+const TYPES = {
+  requirement: { label: 'Requirement', short: 'REQ', color: 'blue', icon: 'file-check' },
+  testcase:    { label: 'Test Case',   short: 'TC',  color: 'green', icon: 'test-tubes' },
+  task:        { label: 'Task',        short: 'TSK', color: 'amber', icon: 'check-square' },
+  changerequest:{ label: 'Change Req', short: 'CR',  color: 'purple', icon: 'git-pull-request' },
+  defect:      { label: 'Defect',      short: 'DEF', color: 'red', icon: 'bug' }
+};
+
+const STATUSES = {
+  draft:     { label: 'Draft',        color: 'zinc',   next: ['in_review'] },
+  in_review: { label: 'Under Review', color: 'amber',  next: ['reviewed', 'rejected'] },
+  reviewed:  { label: 'Reviewed',     color: 'blue',   next: ['approved', 'rejected', 'draft'] },
+  approved:  { label: 'Approved',     color: 'green',  next: ['draft'] },
+  rejected:  { label: 'Rejected',     color: 'red',    next: ['draft'] }
+};
+
+const PRIORITIES = {
+  critical: { label: 'Critical', color: 'red' },
+  high:     { label: 'High',     color: 'orange' },
+  medium:   { label: 'Medium',   color: 'amber' },
+  low:      { label: 'Low',      color: 'zinc' }
+};
+
+const LINK_ROLES = {
+  parent:         { label: 'Parent of',      reverse: 'child' },
+  child:          { label: 'Child of',        reverse: 'parent' },
+  verifies:       { label: 'Verifies',        reverse: 'verified_by' },
+  verified_by:    { label: 'Verified by',     reverse: 'verifies' },
+  implements:     { label: 'Implements',      reverse: 'implemented_by' },
+  implemented_by: { label: 'Implemented by',  reverse: 'implements' },
+  relates_to:     { label: 'Relates to',      reverse: 'relates_to' },
+  depends_on:     { label: 'Depends on',      reverse: 'depended_by' },
+  depended_by:    { label: 'Depended by',     reverse: 'depends_on' }
+};
+
+// ========================== STATE ==========================
+let state = {
+  projects: [],
+  currentProject: null,
+  workItems: [],
+  documents: [],
+  links: [],
+  baselines: [],
+  activity: [],
+  nextId: 1,
+  nextDocId: 1,
+  sortField: 'id',
+  sortDir: 'desc',
+  currentFilter: 'all',
+  selectedWI: null,
+  currentDocId: null
+};
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('reqforge_state');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      state = { ...state, ...parsed };
+    }
+    if (!state.projects.length) {
+      state.projects = [{ id: 'proj1', name: 'Default Project', created: new Date().toISOString() }];
+      state.currentProject = 'proj1';
+    }
+    if (!state.currentProject) state.currentProject = state.projects[0]?.id;
+  } catch(e) { console.error('Load state error', e); }
+}
+
+function saveState() {
+  try { localStorage.setItem('reqforge_state', JSON.stringify(state)); } catch(e) {}
+}
+
+function getProjectItems() { return state.workItems.filter(wi => wi.project === state.currentProject); }
+function getProjectDocs() { return state.documents.filter(d => d.project === state.currentProject); }
+function getProjectLinks() { return state.links.filter(l => l.project === state.currentProject); }
+function getProjectBaselines() { return state.baselines.filter(b => b.project === state.currentProject); }
+
+// ========================== TOAST ==========================
+function toast(msg, type='success') {
+  const c = document.getElementById('toastContainer');
+  const colors = { success: 'border-green-500 text-green-400', error: 'border-red-500 text-red-400', info: 'border-amber-500 text-amber-400' };
+  const div = document.createElement('div');
+  div.className = `toast bg-zinc-900 border ${colors[type]} rounded-lg px-4 py-3 text-xs font-mono shadow-lg`;
+  div.textContent = msg;
+  c.appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
+
+// ========================== ACTIVITY LOG ==========================
+function logActivity(action, itemId, details) {
+  state.activity.unshift({ action, itemId, details, time: new Date().toISOString(), project: state.currentProject });
+  if (state.activity.length > 200) state.activity = state.activity.slice(0, 200);
+  saveState();
+}
+
+// ========================== PROJECTS ==========================
+function toggleProjectDropdown() {
+  const dd = document.getElementById('projectDropdown');
+  dd.classList.toggle('hidden');
+  if (!dd.classList.contains('hidden')) renderProjectDropdown();
+}
+
+function renderProjectDropdown() {
+  const dd = document.getElementById('projectDropdown');
+  dd.innerHTML = state.projects.map(p => `
+    <button onclick="switchProject('${p.id}')" class="w-full text-left px-3 py-2 text-xs font-mono hover:bg-zinc-800 transition-colors flex items-center gap-2 ${p.id===state.currentProject?'text-amber-400':'text-zinc-300'}">
+      <i data-lucide="folder" class="w-3.5 h-3.5"></i> ${esc(p.name)}
+      ${p.id===state.currentProject?'<i data-lucide="check" class="w-3 h-3 ml-auto"></i>':''}
+    </button>
+  `).join('') + `
+    <div class="border-t border-zinc-700 mt-1 pt-1">
+      <button onclick="createProject()" class="w-full text-left px-3 py-2 text-xs font-mono text-amber-400 hover:bg-zinc-800 transition-colors flex items-center gap-2">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i> New Project
+      </button>
+    </div>`;
+  lucide.createIcons();
+}
+
+function switchProject(id) {
+  state.currentProject = id;
+  document.getElementById('currentProjectName').textContent = state.projects.find(p=>p.id===id)?.name || 'Unknown';
+  document.getElementById('projectDropdown').classList.add('hidden');
+  saveState();
+  refreshAll();
+}
+
+function createProject() {
+  const name = prompt('Project name:');
+  if (!name) return;
+  const id = 'proj' + Date.now();
+  state.projects.push({ id, name, created: new Date().toISOString() });
+  switchProject(id);
+  toast('Project created', 'success');
+}
+
+// ========================== VIEW SWITCHING ==========================
+let currentView = 'dashboard';
+
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('view-hidden'));
+  document.getElementById('view-' + view)?.classList.remove('view-hidden');
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  refreshCurrentView();
+}
+
+function refreshCurrentView() {
+  switch(currentView) {
+    case 'dashboard': renderDashboard(); break;
+    case 'documents': renderDocuments(); break;
+    case 'workitems': renderWorkItems(); break;
+    case 'tree': renderTree(); break;
+    case 'matrix': renderMatrix(); break;
+    case 'baselines': renderBaselines(); break;
+  }
+}
+
+function refreshAll() {
+  refreshCurrentView();
+}
+
+// ========================== DASHBOARD ==========================
+function renderDashboard() {
+  const items = getProjectItems();
+  const statsEl = document.getElementById('dashStats');
+  const total = items.length;
+  const approved = items.filter(i=>i.status==='approved').length;
+  const inReview = items.filter(i=>i.status==='in_review').length;
+  const coverage = total > 0 ? Math.round((items.filter(i => getLinksFor(i.id).length > 0).length / total) * 100) : 0;
+
+  statsEl.innerHTML = [
+    { label: 'Total Items', value: total, icon: 'layers', color: 'amber' },
+    { label: 'Approved', value: approved, icon: 'check-circle', color: 'green' },
+    { label: 'Under Review', value: inReview, icon: 'clock', color: 'amber' },
+    { label: 'Trace Coverage', value: coverage + '%', icon: 'link', color: 'blue' }
+  ].map(s => `
+    <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5 hover:border-amber-500/50 transition-all duration-300">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-mono text-zinc-500">${s.label}</span>
+        <i data-lucide="${s.icon}" class="w-4 h-4 text-${s.color}-400"></i>
+      </div>
+      <div class="font-mono font-bold text-2xl text-zinc-100">${s.value}</div>
+    </div>`).join('');
+
+  // Render charts with simple canvas bars
+  renderStatusChart(items);
+  renderTypeChart(items);
+
+  // Recent activity
+  const actEl = document.getElementById('recentActivity');
+  const acts = state.activity.filter(a => a.project === state.currentProject).slice(0, 20);
+  actEl.innerHTML = acts.length ? acts.map(a => `
+    <div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors">
+      <i data-lucide="activity" class="w-3.5 h-3.5 text-amber-500 shrink-0"></i>
+      <span class="text-xs text-zinc-300 flex-1">${esc(a.details)}</span>
+      <span class="text-[10px] font-mono text-zinc-600 shrink-0">${timeAgo(a.time)}</span>
+    </div>`).join('') : '<div class="text-xs text-zinc-600 font-mono px-3">No activity yet</div>';
+
+  lucide.createIcons();
+}
+
+function renderStatusChart(items) {
+  const canvas = document.getElementById('statusChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.parentElement.clientWidth - 40;
+  const h = canvas.height = 180;
+  ctx.clearRect(0, 0, w, h);
+
+  const counts = Object.keys(STATUSES).map(s => ({ key: s, label: STATUSES[s].label, count: items.filter(i=>i.status===s).length }));
+  const max = Math.max(...counts.map(c=>c.count), 1);
+  const barW = Math.min(60, (w - 40) / counts.length - 10);
+  const colors = { draft: '#71717a', in_review: '#f59e0b', reviewed: '#60a5fa', approved: '#34d399', rejected: '#f87171' };
+
+  counts.forEach((c, i) => {
+    const x = 20 + i * ((w - 40) / counts.length) + ((w - 40) / counts.length - barW) / 2;
+    const barH = (c.count / max) * (h - 50);
+    ctx.fillStyle = colors[c.key] || '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(x, h - 30 - barH, barW, barH, 4);
+    ctx.fill();
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '10px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.label, x + barW/2, h - 14);
+    ctx.fillStyle = '#f4f4f5';
+    ctx.fillText(c.count, x + barW/2, h - 34 - barH);
+  });
+}
+
+function renderTypeChart(items) {
+  const canvas = document.getElementById('typeChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.parentElement.clientWidth - 40;
+  const h = canvas.height = 180;
+  ctx.clearRect(0, 0, w, h);
+
+  const counts = Object.keys(TYPES).map(t => ({ key: t, label: TYPES[t].short, count: items.filter(i=>i.type===t).length }));
+  const max = Math.max(...counts.map(c=>c.count), 1);
+  const barW = Math.min(60, (w - 40) / counts.length - 10);
+  const colors = { requirement: '#60a5fa', testcase: '#34d399', task: '#f59e0b', changerequest: '#a78bfa', defect: '#f87171' };
+
+  counts.forEach((c, i) => {
+    const x = 20 + i * ((w - 40) / counts.length) + ((w - 40) / counts.length - barW) / 2;
+    const barH = (c.count / max) * (h - 50);
+    ctx.fillStyle = colors[c.key] || '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(x, h - 30 - barH, barW, barH, 4);
+    ctx.fill();
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = '10px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.label, x + barW/2, h - 14);
+    ctx.fillStyle = '#f4f4f5';
+    ctx.fillText(c.count, x + barW/2, h - 34 - barH);
+  });
+}
+
+// ========================== WORK ITEMS ==========================
+function openNewWorkItemModal(type) {
+  document.getElementById('wiModalTitle').textContent = 'New Work Item';
+  document.getElementById('wiEditId').value = '';
+  document.getElementById('wiType').value = type || 'requirement';
+  document.getElementById('wiPriority').value = 'medium';
+  document.getElementById('wiTitle').value = '';
+  document.getElementById('wiDescription').value = '';
+  document.getElementById('wiAssignee').value = '';
+  document.getElementById('wiTestSteps').value = '';
+  document.getElementById('wiExpectedResult').value = '';
+  populateDocSelect();
+  toggleTestCaseFields();
+  document.getElementById('wiModal').classList.remove('hidden');
+  document.getElementById('wiType').addEventListener('change', toggleTestCaseFields);
+}
+
+function populateDocSelect() {
+  const sel = document.getElementById('wiDocument');
+  sel.innerHTML = '<option value="">None</option>' + getProjectDocs().map(d => `<option value="${d.id}">${esc(d.title)}</option>`).join('');
+}
+
+function toggleTestCaseFields() {
+  document.getElementById('testCaseFields').classList.toggle('hidden', document.getElementById('wiType').value !== 'testcase');
+}
+
+function closeWIModal() { document.getElementById('wiModal').classList.add('hidden'); }
+
+function saveWorkItem() {
+  const editId = document.getElementById('wiEditId').value;
+  const type = document.getElementById('wiType').value;
+  const title = document.getElementById('wiTitle').value.trim();
+  const description = document.getElementById('wiDescription').value.trim();
+  const priority = document.getElementById('wiPriority').value;
+  const assignee = document.getElementById('wiAssignee').value.trim();
+  const docId = document.getElementById('wiDocument').value;
+
+  if (!title) { toast('Title is required', 'error'); return; }
+
+  if (editId) {
+    const wi = state.workItems.find(w => w.id === editId);
+    if (wi) {
+      wi.type = type; wi.title = title; wi.description = description;
+      wi.priority = priority; wi.assignee = assignee; wi.documentId = docId;
+      wi.updated = new Date().toISOString();
+      if (type === 'testcase') {
+        wi.testSteps = document.getElementById('wiTestSteps').value;
+        wi.expectedResult = document.getElementById('wiExpectedResult').value;
+      }
+      logActivity('updated', wi.id, `Updated ${TYPES[type].short}-${wi.numId}: "${title}"`);
+      toast('Work item updated');
+    }
+  } else {
+    const numId = state.nextId++;
+    const wi = {
+      id: TYPES[type].short + '-' + numId,
+      numId,
+      type, title, description, priority, assignee,
+      status: 'draft',
+      documentId: docId,
+      project: state.currentProject,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      comments: [],
+      history: [{ action: 'created', time: new Date().toISOString(), details: 'Work item created' }]
+    };
+    if (type === 'testcase') {
+      wi.testSteps = document.getElementById('wiTestSteps').value;
+      wi.expectedResult = document.getElementById('wiExpectedResult').value;
+    }
+    state.workItems.push(wi);
+    logActivity('created', wi.id, `Created ${wi.id}: "${title}"`);
+    toast('Work item created');
+  }
+
+  saveState();
+  closeWIModal();
+  refreshAll();
+}
+
+function editWorkItem(id) {
+  const wi = state.workItems.find(w => w.id === id);
+  if (!wi) return;
+  document.getElementById('wiModalTitle').textContent = 'Edit ' + wi.id;
+  document.getElementById('wiEditId').value = wi.id;
+  document.getElementById('wiType').value = wi.type;
+  document.getElementById('wiPriority').value = wi.priority;
+  document.getElementById('wiTitle').value = wi.title;
+  document.getElementById('wiDescription').value = wi.description || '';
+  document.getElementById('wiAssignee').value = wi.assignee || '';
+  document.getElementById('wiTestSteps').value = wi.testSteps || '';
+  document.getElementById('wiExpectedResult').value = wi.expectedResult || '';
+  populateDocSelect();
+  document.getElementById('wiDocument').value = wi.documentId || '';
+  toggleTestCaseFields();
+  document.getElementById('wiModal').classList.remove('hidden');
+}
+
+function deleteWorkItem(id) {
+  if (!confirm('Delete ' + id + '?')) return;
+  state.workItems = state.workItems.filter(w => w.id !== id);
+  state.links = state.links.filter(l => l.source !== id && l.target !== id);
+  logActivity('deleted', id, `Deleted ${id}`);
+  saveState();
+  refreshAll();
+  toast('Work item deleted');
+}
+
+function changeStatus(id, newStatus) {
+  const wi = state.workItems.find(w => w.id === id);
+  if (!wi) return;
+  const old = wi.status;
+  wi.status = newStatus;
+  wi.updated = new Date().toISOString();
+  wi.history = wi.history || [];
+  wi.history.push({ action: 'status_change', from: old, to: newStatus, time: new Date().toISOString(), details: `Status: ${STATUSES[old].label} → ${STATUSES[newStatus].label}` });
+  logActivity('status_change', wi.id, `${wi.id}: ${STATUSES[old].label} → ${STATUSES[newStatus].label}`);
+  saveState();
+  refreshAll();
+  toast(`Status changed to ${STATUSES[newStatus].label}`);
+}
+
+// ========================== WORK ITEMS TABLE ==========================
+function renderWorkItems() {
+  const filterType = document.getElementById('wiFilterType')?.value || 'all';
+  const filterStatus = document.getElementById('wiFilterStatus')?.value || 'all';
+  const filterPriority = document.getElementById('wiFilterPriority')?.value || 'all';
+
+  let items = getProjectItems();
+  if (filterType !== 'all') items = items.filter(i => i.type === filterType);
+  if (state.currentFilter !== 'all') items = items.filter(i => i.type === state.currentFilter);
+  if (filterStatus !== 'all') items = items.filter(i => i.status === filterStatus);
+  if (filterPriority !== 'all') items = items.filter(i => i.priority === filterPriority);
+
+  items.sort((a, b) => {
+    let va = a[state.sortField], vb = b[state.sortField];
+    if (state.sortField === 'id') { va = a.numId; vb = b.numId; }
+    if (state.sortField === 'updated') { va = new Date(a.updated); vb = new Date(b.updated); }
+    if (va < vb) return state.sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return state.sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('wiTableBody');
+  tbody.innerHTML = items.map(wi => {
+    const t = TYPES[wi.type];
+    const s = STATUSES[wi.status];
+    const p = PRIORITIES[wi.priority];
+    const linkCount = getLinksFor(wi.id).length;
+    return `
+    <tr class="border-b border-zinc-800 hover:bg-zinc-900/80 cursor-pointer transition-colors" onclick="openDetailFlyout('${wi.id}')">
+      <td class="px-4 py-3 font-mono text-amber-400 text-xs">${wi.id}</td>
+      <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span></td>
+      <td class="px-4 py-3 text-zinc-100 font-medium">${esc(wi.title)}</td>
+      <td class="px-4 py-3"><span class="flex items-center gap-1.5"><span class="status-dot bg-${s.color}-400"></span><span class="text-xs font-mono text-${s.color}-400">${s.label}</span></span></td>
+      <td class="px-4 py-3"><span class="text-xs font-mono text-${p.color}-400">${p.label}</span></td>
+      <td class="px-4 py-3 text-xs font-mono text-zinc-500">${timeAgo(wi.updated)}</td>
+      <td class="px-4 py-3"><span class="text-xs font-mono ${linkCount > 0 ? 'text-amber-400' : 'text-zinc-600'}">${linkCount}</span></td>
+      <td class="px-4 py-3" onclick="event.stopPropagation()">
+        <div class="flex items-center gap-1">
+          <button onclick="editWorkItem('${wi.id}')" class="text-zinc-400 hover:text-amber-400 p-1 rounded hover:bg-zinc-800"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+          <button onclick="openLinkModal('${wi.id}')" class="text-zinc-400 hover:text-amber-400 p-1 rounded hover:bg-zinc-800"><i data-lucide="link" class="w-3.5 h-3.5"></i></button>
+          <button onclick="deleteWorkItem('${wi.id}')" class="text-zinc-400 hover:text-red-400 p-1 rounded hover:bg-zinc-800"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="text-center py-12 text-zinc-600 font-mono">No work items found. Create one to get started.</td></tr>';
+
+  lucide.createIcons();
+}
+
+function sortWorkItems(field) {
+  if (state.sortField === field) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+  else { state.sortField = field; state.sortDir = 'asc'; }
+  renderWorkItems();
+}
+
+function filterByType(type) {
+  state.currentFilter = type;
+  if (currentView !== 'workitems') switchView('workitems');
+  else renderWorkItems();
+}
+
+function setWISubView() { /* placeholder for future sub-views */ }
+
+// ========================== DETAIL FLYOUT ==========================
+function openDetailFlyout(id) {
+  const wi = state.workItems.find(w => w.id === id);
+  if (!wi) return;
+  state.selectedWI = id;
+  const t = TYPES[wi.type];
+  const s = STATUSES[wi.status];
+  const p = PRIORITIES[wi.priority];
+  const links = getLinksFor(id);
+  const nextStatuses = STATUSES[wi.status]?.next || [];
+
+  const content = document.getElementById('detailFlyoutContent');
+  content.innerHTML = `
+    <div class="sticky top-0 bg-zinc-900 border-b border-zinc-700 p-4 flex items-center justify-between z-10">
+      <div class="flex items-center gap-2">
+        <span class="text-xs px-2 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span>
+        <span class="font-mono font-bold text-amber-400">${wi.id}</span>
+      </div>
+      <button onclick="closeDetailFlyout()" class="text-zinc-400 hover:text-amber-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-5 space-y-5">
+      <h2 class="font-mono font-bold text-zinc-100 text-lg">${esc(wi.title)}</h2>
+
+      <!-- Status & Actions -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-${s.color}-500/10 border border-${s.color}-500/30">
+          <span class="status-dot bg-${s.color}-400"></span>
+          <span class="text-xs font-mono text-${s.color}-400">${s.label}</span>
+        </span>
+        ${nextStatuses.map(ns => `<button onclick="changeStatus('${wi.id}','${ns}')" class="text-xs font-mono px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-amber-500/50 hover:text-amber-400 transition-colors">→ ${STATUSES[ns].label}</button>`).join('')}
+      </div>
+
+      <!-- Properties -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Priority</div>
+          <span class="text-xs font-mono text-${p.color}-400">${p.label}</span>
+        </div>
+        <div class="bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Assignee</div>
+          <span class="text-xs font-mono text-zinc-300">${esc(wi.assignee || 'Unassigned')}</span>
+        </div>
+        <div class="bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Created</div>
+          <span class="text-xs font-mono text-zinc-400">${new Date(wi.created).toLocaleDateString()}</span>
+        </div>
+        <div class="bg-zinc-800 rounded-lg p-3">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Updated</div>
+          <span class="text-xs font-mono text-zinc-400">${timeAgo(wi.updated)}</span>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div>
+        <div class="text-[10px] font-mono text-zinc-500 uppercase mb-2">Description</div>
+        <div class="bg-zinc-800 rounded-lg p-4 text-xs text-zinc-300 whitespace-pre-wrap min-h-[60px]">${esc(wi.description || 'No description')}</div>
+      </div>
+
+      ${wi.type === 'testcase' ? `
+      <div>
+        <div class="text-[10px] font-mono text-zinc-500 uppercase mb-2">Test Steps</div>
+        <div class="bg-zinc-800 rounded-lg p-4 text-xs text-zinc-300 whitespace-pre-wrap">${esc(wi.testSteps || 'None')}</div>
+      </div>
+      <div>
+        <div class="text-[10px] font-mono text-zinc-500 uppercase mb-2">Expected Result</div>
+        <div class="bg-zinc-800 rounded-lg p-4 text-xs text-zinc-300 whitespace-pre-wrap">${esc(wi.expectedResult || 'None')}</div>
+      </div>` : ''}
+
+      <!-- Links -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[10px] font-mono text-zinc-500 uppercase">Linked Items (${links.length})</div>
+          <button onclick="openLinkModal('${wi.id}')" class="text-xs font-mono text-amber-400 hover:text-amber-300">+ Add Link</button>
+        </div>
+        <div class="space-y-1.5">
+          ${links.length ? links.map(l => {
+            const targetId = l.source === wi.id ? l.target : l.source;
+            const role = l.source === wi.id ? l.role : (LINK_ROLES[l.role]?.reverse || l.role);
+            const target = state.workItems.find(w => w.id === targetId);
+            if (!target) return '';
+            const tt = TYPES[target.type];
+            return `<div class="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors cursor-pointer" onclick="openDetailFlyout('${targetId}')">
+              <span class="text-[10px] font-mono text-zinc-500 w-24">${LINK_ROLES[role]?.label || role}</span>
+              <span class="text-xs px-1.5 py-0.5 bg-${tt.color}-500/10 text-${tt.color}-400 rounded font-mono">${tt.short}</span>
+              <span class="text-xs font-mono text-amber-400">${targetId}</span>
+              <span class="text-xs text-zinc-300 flex-1 truncate">${esc(target.title)}</span>
+              <button onclick="event.stopPropagation(); removeLink('${l.id}')" class="text-zinc-600 hover:text-red-400 p-0.5"><i data-lucide="x" class="w-3 h-3"></i></button>
+            </div>`;
+          }).join('') : '<div class="text-xs text-zinc-600 font-mono px-3 py-2">No linked items</div>'}
+        </div>
+      </div>
+
+      <!-- Comments -->
+      <div>
+        <div class="text-[10px] font-mono text-zinc-500 uppercase mb-2">Comments (${(wi.comments||[]).length})</div>
+        <div class="space-y-2 mb-3" id="commentsContainer">
+          ${(wi.comments||[]).map((c,i) => `
+            <div class="bg-zinc-800 rounded-lg p-3">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-mono text-amber-400">${esc(c.author)}</span>
+                <span class="text-[10px] font-mono text-zinc-600">${timeAgo(c.time)}</span>
+              </div>
+              <div class="text-xs text-zinc-300">${esc(c.text)}</div>
+            </div>`).join('')}
+        </div>
+        <div class="flex gap-2">
+          <input type="text" id="commentInput" placeholder="Add a comment..." class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none" onkeydown="if(event.key==='Enter')addComment('${wi.id}')">
+          <button onclick="addComment('${wi.id}')" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-3 py-2 rounded-lg text-xs transition-colors">Post</button>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div>
+        <div class="text-[10px] font-mono text-zinc-500 uppercase mb-2">History</div>
+        <div class="space-y-1">
+          ${(wi.history||[]).map(h => `
+            <div class="flex items-center gap-2 text-[11px] text-zinc-500 px-2 py-1">
+              <i data-lucide="clock" class="w-3 h-3"></i>
+              <span>${esc(h.details)}</span>
+              <span class="ml-auto font-mono text-[10px] text-zinc-600">${timeAgo(h.time)}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('detailFlyout').classList.remove('hidden');
+  document.getElementById('detailOverlay').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+function closeDetailFlyout() {
+  document.getElementById('detailFlyout').classList.add('hidden');
+  document.getElementById('detailOverlay').classList.add('hidden');
+  state.selectedWI = null;
+}
+
+function addComment(wiId) {
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const wi = state.workItems.find(w => w.id === wiId);
+  if (!wi) return;
+  wi.comments = wi.comments || [];
+  wi.comments.push({ author: 'You', text, time: new Date().toISOString() });
+  wi.updated = new Date().toISOString();
+  logActivity('comment', wiId, `Commented on ${wiId}`);
+  saveState();
+  openDetailFlyout(wiId);
+}
+
+// ========================== LINKS ==========================
+function getLinksFor(id) {
+  return state.links.filter(l => l.source === id || l.target === id);
+}
+
+function openLinkModal(sourceId) {
+  document.getElementById('linkSourceId').value = sourceId;
+  const sel = document.getElementById('linkTarget');
+  const items = getProjectItems().filter(i => i.id !== sourceId);
+  sel.innerHTML = items.map(i => `<option value="${i.id}">${i.id} — ${esc(i.title)}</option>`).join('');
+  document.getElementById('linkModal').classList.remove('hidden');
+}
+
+function closeLinkModal() { document.getElementById('linkModal').classList.add('hidden'); }
+
+function saveLink() {
+  const source = document.getElementById('linkSourceId').value;
+  const target = document.getElementById('linkTarget').value;
+  const role = document.getElementById('linkRole').value;
+  if (!source || !target) { toast('Select a target', 'error'); return; }
+
+  // Check duplicate
+  const exists = state.links.find(l =>
+    (l.source === source && l.target === target && l.role === role) ||
+    (l.source === target && l.target === source && l.role === (LINK_ROLES[role]?.reverse || role))
+  );
+  if (exists) { toast('Link already exists', 'error'); return; }
+
+  state.links.push({
+    id: 'link' + Date.now(),
+    source, target, role,
+    project: state.currentProject,
+    created: new Date().toISOString()
+  });
+
+  const wi = state.workItems.find(w => w.id === source);
+  if (wi) {
+    wi.history = wi.history || [];
+    wi.history.push({ action: 'linked', time: new Date().toISOString(), details: `Linked → ${target} (${LINK_ROLES[role]?.label || role})` });
+  }
+  logActivity('linked', source, `${source} linked to ${target} (${LINK_ROLES[role]?.label || role})`);
+  saveState();
+  closeLinkModal();
+  refreshAll();
+  if (state.selectedWI) openDetailFlyout(state.selectedWI);
+  toast('Link created');
+}
+
+function removeLink(linkId) {
+  state.links = state.links.filter(l => l.id !== linkId);
+  saveState();
+  if (state.selectedWI) openDetailFlyout(state.selectedWI);
+  refreshAll();
+  toast('Link removed');
+}
+
+// ========================== TREE VIEW ==========================
+function renderTree() {
+  const items = getProjectItems();
+  const links = getProjectLinks();
+
+  // Build parent-child map
+  const childMap = {};
+  const hasParent = new Set();
+
+  links.forEach(l => {
+    if (l.role === 'parent' || l.role === 'child') {
+      const parentId = l.role === 'parent' ? l.source : l.target;
+      const childId = l.role === 'parent' ? l.target : l.source;
+      if (!childMap[parentId]) childMap[parentId] = [];
+      childMap[parentId].push(childId);
+      hasParent.add(childId);
+    }
+  });
+
+  const roots = items.filter(i => !hasParent.has(i.id));
+  const container = document.getElementById('treeContainer');
+
+  function buildNode(wi, depth = 0) {
+    const t = TYPES[wi.type];
+    const s = STATUSES[wi.status];
+    const children = (childMap[wi.id] || []).map(cid => state.workItems.find(w => w.id === cid)).filter(Boolean);
+    const hasChildren = children.length > 0;
+
+    return `
+      <div class="tree-node" data-id="${wi.id}">
+        <div class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-800 cursor-pointer group transition-colors" onclick="openDetailFlyout('${wi.id}')">
+          ${hasChildren ? `<button onclick="event.stopPropagation(); toggleTreeNode(this)" class="text-zinc-500 hover:text-amber-400 shrink-0"><i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform"></i></button>` : '<span class="w-3.5 shrink-0"></span>'}
+          <span class="text-xs px-1.5 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono shrink-0">${t.short}</span>
+          <span class="text-xs font-mono text-amber-400 shrink-0">${wi.id}</span>
+          <span class="text-xs text-zinc-200 truncate flex-1">${esc(wi.title)}</span>
+          <span class="flex items-center gap-1"><span class="status-dot bg-${s.color}-400"></span><span class="text-[10px] font-mono text-${s.color}-400">${s.label}</span></span>
+        </div>
+        ${hasChildren ? `<div class="tree-children">${children.map(c => buildNode(c, depth+1)).join('')}</div>` : ''}
+      </div>`;
+  }
+
+  container.innerHTML = roots.length ? roots.map(r => buildNode(r)).join('') :
+    '<div class="flex flex-col items-center justify-center h-64 text-zinc-600 font-mono text-sm"><i data-lucide="git-branch" class="w-10 h-10 mb-3"></i><p>No hierarchy found. Create parent-child links between items.</p></div>';
+
+  lucide.createIcons();
+}
+
+function toggleTreeNode(btn) {
+  const node = btn.closest('.tree-node');
+  node.classList.toggle('collapsed');
+  const icon = btn.querySelector('[data-lucide]');
+  if (icon) icon.style.transform = node.classList.contains('collapsed') ? 'rotate(-90deg)' : '';
+}
+
+function expandAllTree() { document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('collapsed')); }
+function collapseAllTree() { document.querySelectorAll('.tree-node').forEach(n => { if (n.querySelector('.tree-children')) n.classList.add('collapsed'); }); }
+
+// ========================== TRACEABILITY MATRIX ==========================
+function renderMatrix() {
+  const rowType = document.getElementById('matrixRowType').value;
+  const colType = document.getElementById('matrixColType').value;
+  const items = getProjectItems();
+  const links = getProjectLinks();
+
+  const rowItems = items.filter(i => i.type === rowType);
+  const colItems = items.filter(i => i.type === colType);
+
+  if (!rowItems.length || !colItems.length) {
+    document.getElementById('matrixContainer').innerHTML = '<div class="text-center py-12 text-zinc-600 font-mono text-sm">Not enough items to display matrix. Create items of both types.</div>';
+    return;
+  }
+
+  // Build link lookup
+  const linkSet = new Set();
+  links.forEach(l => {
+    linkSet.add(l.source + '|' + l.target);
+    linkSet.add(l.target + '|' + l.source);
+  });
+
+  const hasLink = (a, b) => linkSet.has(a + '|' + b);
+
+  const html = `
+    <div class="overflow-auto">
+      <table class="text-xs border-collapse">
+        <thead>
+          <tr>
+            <th class="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-left font-mono text-zinc-500 border border-zinc-700 min-w-[200px]">${TYPES[rowType].label} \\ ${TYPES[colType].label}</th>
+            ${colItems.map(c => `<th class="bg-zinc-900 px-2 py-2 font-mono text-amber-400 border border-zinc-700 text-center writing-mode-vertical min-w-[40px]"><div class="transform -rotate-45 whitespace-nowrap text-[10px]">${c.id}</div></th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rowItems.map(r => `
+            <tr>
+              <td class="sticky left-0 z-10 bg-zinc-900 px-3 py-2 font-mono border border-zinc-700">
+                <span class="text-amber-400">${r.id}</span>
+                <span class="text-zinc-400 ml-2 truncate">${esc(r.title).slice(0, 30)}</span>
+              </td>
+              ${colItems.map(c => {
+                const linked = hasLink(r.id, c.id);
+                return `<td class="matrix-cell border border-zinc-700 text-center cursor-pointer hover:bg-zinc-800 transition-colors ${linked ? 'bg-amber-500/20' : ''}" onclick="toggleMatrixLink('${r.id}','${c.id}')">
+                  ${linked ? '<i data-lucide="check" class="w-4 h-4 text-amber-400 mx-auto"></i>' : ''}
+                </td>`;
+              }).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex items-center gap-4 text-[10px] font-mono text-zinc-500">
+      <span class="flex items-center gap-1"><span class="w-4 h-4 bg-amber-500/20 rounded border border-zinc-700"></span> Linked</span>
+      <span class="flex items-center gap-1"><span class="w-4 h-4 bg-zinc-900 rounded border border-zinc-700"></span> Not linked</span>
+      <span>Click cells to toggle links</span>
+    </div>`;
+
+  document.getElementById('matrixContainer').innerHTML = html;
+  lucide.createIcons();
+}
+
+function toggleMatrixLink(rowId, colId) {
+  const existing = state.links.find(l =>
+    (l.source === rowId && l.target === colId) || (l.source === colId && l.target === rowId)
+  );
+  if (existing) {
+    state.links = state.links.filter(l => l.id !== existing.id);
+    toast('Link removed');
+  } else {
+    state.links.push({
+      id: 'link' + Date.now(),
+      source: rowId, target: colId, role: 'relates_to',
+      project: state.currentProject,
+      created: new Date().toISOString()
+    });
+    toast('Link created');
+  }
+  saveState();
+  renderMatrix();
+}
+
+// ========================== DOCUMENTS ==========================
+function renderDocuments() {
+  const docs = getProjectDocs();
+  const sidebar = document.getElementById('docSidebar');
+
+  sidebar.innerHTML = `
+    <div class="text-[10px] font-mono text-zinc-500 uppercase mb-2 px-2">Documents (${docs.length})</div>
+    ${docs.map(d => `
+      <button onclick="openDocument('${d.id}')" class="w-full text-left px-3 py-2 rounded-lg text-xs font-mono hover:bg-zinc-800 transition-colors flex items-center gap-2 ${state.currentDocId === d.id ? 'bg-amber-500/10 text-amber-400' : 'text-zinc-300'}">
+        <i data-lucide="file-text" class="w-3.5 h-3.5 shrink-0"></i>
+        <span class="truncate">${esc(d.title)}</span>
+      </button>`).join('')}
+    ${!docs.length ? '<div class="text-xs text-zinc-600 font-mono px-3 py-4">No documents yet</div>' : ''}`;
+  lucide.createIcons();
+}
+
+function openNewDocModal() { document.getElementById('docModal').classList.remove('hidden'); }
+function closeDocModal() { document.getElementById('docModal').classList.add('hidden'); }
+
+function saveDocument() {
+  const title = document.getElementById('docTitle').value.trim();
+  const type = document.getElementById('docType').value;
+  if (!title) { toast('Title required', 'error'); return; }
+
+  const doc = {
+    id: 'DOC-' + state.nextDocId++,
+    title, type,
+    project: state.currentProject,
+    sections: [{ id: 'sec1', title: 'Introduction', content: 'Enter document content here...', workItems: [] }],
+    status: 'draft',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString()
+  };
+  state.documents.push(doc);
+  logActivity('created', doc.id, `Created document: "${title}"`);
+  saveState();
+  closeDocModal();
+  openDocument(doc.id);
+  renderDocuments();
+  toast('Document created');
+}
+
+function openDocument(docId) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) return;
+  state.currentDocId = docId;
+
+  const docTypes = { srs: 'System Requirements Specification', sds: 'System Design Specification', tp: 'Test Plan', vp: 'Verification Procedures', generic: 'Generic Document' };
+  const editor = document.getElementById('docEditor');
+  const docItems = getProjectItems().filter(wi => wi.documentId === docId);
+
+  editor.innerHTML = `
+    <div class="max-w-4xl mx-auto">
+      <!-- Doc Header -->
+      <div class="flex items-center gap-2 mb-1">
+        <div class="flex gap-1.5">
+          <div class="w-3 h-3 rounded-full bg-red-500"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+          <div class="w-3 h-3 rounded-full bg-green-500"></div>
+        </div>
+        <span class="text-[10px] font-mono text-zinc-600">${doc.id}</span>
+        <span class="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-400 rounded font-mono">${docTypes[doc.type] || doc.type}</span>
+      </div>
+      <h1 class="font-mono font-bold text-amber-500 text-2xl mb-6" contenteditable="true" onblur="updateDocTitle('${doc.id}', this.textContent)">${esc(doc.title)}</h1>
+
+      <!-- Document Sections -->
+      <div id="docSections" class="space-y-6">
+        ${doc.sections.map((sec, i) => `
+          <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5" data-sec-id="${sec.id}">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="font-mono font-bold text-zinc-100 text-base" contenteditable="true" onblur="updateSection('${doc.id}','${sec.id}','title',this.textContent)">${esc(sec.title)}</h2>
+              <div class="flex gap-1">
+                <button onclick="addWorkItemToSection('${doc.id}','${sec.id}')" class="text-xs font-mono text-amber-400 hover:text-amber-300 px-2 py-1 rounded hover:bg-zinc-800">+ Work Item</button>
+                <button onclick="removeSection('${doc.id}','${sec.id}')" class="text-zinc-500 hover:text-red-400 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
+            <div class="text-sm text-zinc-300 mb-4 bg-zinc-800 rounded-lg p-4 min-h-[80px]" contenteditable="true" onblur="updateSection('${doc.id}','${sec.id}','content',this.innerHTML)">${sec.content}</div>
+            ${(sec.workItems || []).length ? `
+              <div class="border-t border-zinc-700 pt-3 mt-3 space-y-1.5">
+                <div class="text-[10px] font-mono text-zinc-500 uppercase">Embedded Work Items</div>
+                ${sec.workItems.map(wiId => {
+                  const wi = state.workItems.find(w => w.id === wiId);
+                  if (!wi) return '';
+                  const t = TYPES[wi.type];
+                  return `<div class="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-lg cursor-pointer hover:bg-zinc-700" onclick="openDetailFlyout('${wi.id}')">
+                    <span class="text-xs px-1.5 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span>
+                    <span class="text-xs font-mono text-amber-400">${wi.id}</span>
+                    <span class="text-xs text-zinc-300 truncate">${esc(wi.title)}</span>
+                  </div>`;
+                }).join('')}
+              </div>` : ''}
+          </div>`).join('')}
+      </div>
+
+      <!-- Add Section -->
+      <button onclick="addSection('${doc.id}')" class="mt-4 w-full py-3 border border-dashed border-zinc-700 rounded-lg text-xs font-mono text-zinc-500 hover:text-amber-400 hover:border-amber-500/50 transition-colors">+ Add Section</button>
+
+      <!-- Doc Work Items -->
+      ${docItems.length ? `
+        <div class="mt-8 border-t border-zinc-700 pt-6">
+          <h3 class="font-mono font-bold text-zinc-100 text-sm mb-4">Associated Work Items (${docItems.length})</h3>
+          <div class="space-y-1.5">
+            ${docItems.map(wi => {
+              const t = TYPES[wi.type];
+              const s = STATUSES[wi.status];
+              return `<div class="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg cursor-pointer hover:border-amber-500/50" onclick="openDetailFlyout('${wi.id}')">
+                <span class="text-xs px-1.5 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span>
+                <span class="text-xs font-mono text-amber-400">${wi.id}</span>
+                <span class="text-xs text-zinc-200 flex-1 truncate">${esc(wi.title)}</span>
+                <span class="flex items-center gap-1"><span class="status-dot bg-${s.color}-400"></span><span class="text-[10px] font-mono text-${s.color}-400">${s.label}</span></span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+    </div>`;
+
+  renderDocuments();
+  lucide.createIcons();
+}
+
+function updateDocTitle(docId, newTitle) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (doc) { doc.title = newTitle.trim(); doc.updated = new Date().toISOString(); saveState(); renderDocuments(); }
+}
+
+function updateSection(docId, secId, field, value) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) return;
+  const sec = doc.sections.find(s => s.id === secId);
+  if (sec) { sec[field] = value; doc.updated = new Date().toISOString(); saveState(); }
+}
+
+function addSection(docId) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) return;
+  doc.sections.push({ id: 'sec' + Date.now(), title: 'New Section', content: '', workItems: [] });
+  doc.updated = new Date().toISOString();
+  saveState();
+  openDocument(docId);
+}
+
+function removeSection(docId, secId) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc || doc.sections.length <= 1) { toast('Must have at least one section', 'error'); return; }
+  doc.sections = doc.sections.filter(s => s.id !== secId);
+  doc.updated = new Date().toISOString();
+  saveState();
+  openDocument(docId);
+}
+
+function addWorkItemToSection(docId, secId) {
+  const items = getProjectItems().filter(wi => wi.documentId === docId || !wi.documentId);
+  const choices = items.map(i => i.id + ' — ' + i.title).join('\n');
+  const pick = prompt('Enter work item ID to embed:\n\n' + (choices || 'No items available'));
+  if (!pick) return;
+  const id = pick.split(' ')[0].trim();
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) return;
+  const sec = doc.sections.find(s => s.id === secId);
+  if (!sec) return;
+  sec.workItems = sec.workItems || [];
+  if (!sec.workItems.includes(id)) sec.workItems.push(id);
+  doc.updated = new Date().toISOString();
+  saveState();
+  openDocument(docId);
+}
+
+// ========================== BASELINES ==========================
+function renderBaselines() {
+  const baselines = getProjectBaselines();
+  const container = document.getElementById('baselinesContainer');
+
+  container.innerHTML = baselines.length ? baselines.map(b => `
+    <div class="bg-zinc-900 border border-zinc-700 rounded-lg p-5 hover:border-amber-500/50 transition-all duration-300">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="bookmark" class="w-4 h-4 text-amber-500"></i>
+          <h3 class="font-mono font-bold text-zinc-100">${esc(b.name)}</h3>
+        </div>
+        <span class="text-[10px] font-mono text-zinc-600">${new Date(b.created).toLocaleString()}</span>
+      </div>
+      <p class="text-xs text-zinc-400 mb-3">${esc(b.description || 'No description')}</p>
+      <div class="flex items-center gap-4 text-[10px] font-mono text-zinc-500">
+        <span>${b.snapshot.workItems} work items</span>
+        <span>${b.snapshot.links} links</span>
+        <span>${b.snapshot.documents} documents</span>
+      </div>
+      <div class="mt-3 flex gap-2">
+        <button onclick="viewBaseline('${b.id}')" class="text-xs font-mono text-amber-400 hover:text-amber-300 px-2 py-1 rounded hover:bg-zinc-800">View Snapshot</button>
+        <button onclick="deleteBaseline('${b.id}')" class="text-xs font-mono text-zinc-500 hover:text-red-400 px-2 py-1 rounded hover:bg-zinc-800">Delete</button>
+      </div>
+    </div>`).join('') :
+    '<div class="flex flex-col items-center justify-center h-64 text-zinc-600 font-mono text-sm"><i data-lucide="bookmark" class="w-10 h-10 mb-3"></i><p>No baselines created. Create one to snapshot the current project state.</p></div>';
+
+  lucide.createIcons();
+}
+
+function createBaseline() {
+  const name = prompt('Baseline name:');
+  if (!name) return;
+  const desc = prompt('Description (optional):') || '';
+  const items = getProjectItems();
+  const links = getProjectLinks();
+  const docs = getProjectDocs();
+
+  state.baselines.push({
+    id: 'BL-' + Date.now(),
+    name, description: desc,
+    project: state.currentProject,
+    created: new Date().toISOString(),
+    snapshot: {
+      workItems: items.length,
+      links: links.length,
+      documents: docs.length,
+      data: JSON.parse(JSON.stringify({ items, links, docs }))
+    }
+  });
+
+  logActivity('baseline', null, `Baseline created: "${name}"`);
+  saveState();
+  renderBaselines();
+  toast('Baseline created');
+}
+
+function viewBaseline(blId) {
+  const bl = state.baselines.find(b => b.id === blId);
+  if (!bl) return;
+  alert(`Baseline: ${bl.name}\nCreated: ${new Date(bl.created).toLocaleString()}\n\nSnapshot contains:\n- ${bl.snapshot.workItems} work items\n- ${bl.snapshot.links} links\n- ${bl.snapshot.documents} documents\n\nThis is a read-only snapshot of the project state at the time of creation.`);
+}
+
+function deleteBaseline(blId) {
+  if (!confirm('Delete this baseline?')) return;
+  state.baselines = state.baselines.filter(b => b.id !== blId);
+  saveState();
+  renderBaselines();
+  toast('Baseline deleted');
+}
+
+// ========================== SEARCH ==========================
+function handleGlobalSearch(query) {
+  if (!query.trim()) { refreshCurrentView(); return; }
+  const q = query.toLowerCase();
+  const results = getProjectItems().filter(i =>
+    i.id.toLowerCase().includes(q) ||
+    i.title.toLowerCase().includes(q) ||
+    (i.description || '').toLowerCase().includes(q)
+  );
+
+  if (currentView !== 'workitems') switchView('workitems');
+
+  const tbody = document.getElementById('wiTableBody');
+  tbody.innerHTML = results.map(wi => {
+    const t = TYPES[wi.type];
+    const s = STATUSES[wi.status];
+    const p = PRIORITIES[wi.priority];
+    return `
+    <tr class="border-b border-zinc-800 hover:bg-zinc-900/80 cursor-pointer transition-colors" onclick="openDetailFlyout('${wi.id}')">
+      <td class="px-4 py-3 font-mono text-amber-400 text-xs">${wi.id}</td>
+      <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 bg-${t.color}-500/10 text-${t.color}-400 rounded font-mono">${t.short}</span></td>
+      <td class="px-4 py-3 text-zinc-100">${esc(wi.title)}</td>
+      <td class="px-4 py-3"><span class="flex items-center gap-1.5"><span class="status-dot bg-${s.color}-400"></span><span class="text-xs font-mono text-${s.color}-400">${s.label}</span></span></td>
+      <td class="px-4 py-3"><span class="text-xs font-mono text-${p.color}-400">${p.label}</span></td>
+      <td class="px-4 py-3 text-xs font-mono text-zinc-500">${timeAgo(wi.updated)}</td>
+      <td class="px-4 py-3"><span class="text-xs font-mono text-zinc-600">${getLinksFor(wi.id).length}</span></td>
+      <td class="px-4 py-3"></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="text-center py-8 text-zinc-600 font-mono">No results found</td></tr>';
+
+  lucide.createIcons();
+}
+
+// ========================== NOTIFICATIONS ==========================
+function showNotifications() {
+  const recent = state.activity.filter(a => a.project === state.currentProject).slice(0, 10);
+  alert('Recent Notifications:\n\n' + (recent.map(a => `• ${a.details} (${timeAgo(a.time)})`).join('\n') || 'No notifications'));
+}
+
+// ========================== HELPERS ==========================
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+// ========================== SERVICE WORKER ==========================
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'reqforge-v1';
+    const URLS = ['/'];
+    self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(URLS))); self.skipWaiting(); });
+    self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
+  `;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+}
+
+// ========================== SEED DATA ==========================
+function seedDemoData() {
+  if (state.workItems.length > 0) return;
+
+  const reqs = [
+    { title: 'System shall authenticate users via SSO', priority: 'critical', desc: 'The system must support single sign-on authentication using SAML 2.0 or OpenID Connect protocols.' },
+    { title: 'System shall support role-based access control', priority: 'high', desc: 'Define and enforce user roles: Admin, Manager, Engineer, Viewer with granular permissions.' },
+    { title: 'System shall log all data modifications', priority: 'high', desc: 'Every create, update, and delete operation must be captured in an immutable audit trail.' },
+    { title: 'Response time shall not exceed 2 seconds', priority: 'medium', desc: 'All API endpoints must respond within 2000ms under normal load conditions.' },
+    { title: 'System shall support data export in CSV and PDF', priority: 'low', desc: 'Users can export filtered work item lists and reports in CSV and PDF format.' },
+    { title: 'System shall encrypt data at rest using AES-256', priority: 'critical', desc: 'All stored data including backups must be encrypted using AES-256 encryption.' }
+  ];
+
+  const tcs = [
+    { title: 'Verify SSO login with valid credentials', priority: 'high', steps: '1. Navigate to login page\n2. Click SSO login\n3. Enter valid credentials\n4. Confirm redirect', expected: 'User is authenticated and redirected to dashboard' },
+    { title: 'Verify role permissions enforcement', priority: 'high', steps: '1. Login as Viewer role\n2. Attempt to create work item\n3. Attempt to delete work item', expected: 'Create and delete operations are denied for Viewer role' },
+    { title: 'Verify audit log entries', priority: 'medium', steps: '1. Create a work item\n2. Modify the work item\n3. Check audit log', expected: 'Both create and update entries appear in audit log with timestamps' }
+  ];
+
+  const tasks = [
+    { title: 'Implement SAML 2.0 integration', priority: 'high', desc: 'Integrate with corporate SAML identity provider for SSO.' },
+    { title: 'Design database schema for audit trail', priority: 'medium', desc: 'Create immutable append-only table structure for audit logging.' }
+  ];
+
+  reqs.forEach((r, i) => {
+    state.workItems.push({
+      id: 'REQ-' + (i+1), numId: i+1, type: 'requirement',
+      title: r.title, description: r.desc, priority: r.priority,
+      status: i < 2 ? 'approved' : i < 4 ? 'in_review' : 'draft',
+      assignee: ['Alice', 'Bob', 'Charlie'][i % 3],
+      project: state.currentProject, documentId: '',
+      created: new Date(Date.now() - (6-i)*86400000).toISOString(),
+      updated: new Date(Date.now() - (6-i)*3600000).toISOString(),
+      comments: [], history: [{ action: 'created', time: new Date().toISOString(), details: 'Work item created' }]
+    });
+  });
+
+  state.nextId = reqs.length + 1;
+
+  tcs.forEach((t, i) => {
+    const id = state.nextId++;
+    state.workItems.push({
+      id: 'TC-' + id, numId: id, type: 'testcase',
+      title: t.title, description: '', priority: t.priority,
+      testSteps: t.steps, expectedResult: t.expected,
+      status: 'draft', assignee: 'Diana',
+      project: state.currentProject, documentId: '',
+      created: new Date().toISOString(), updated: new Date().toISOString(),
+      comments: [], history: [{ action: 'created', time: new Date().toISOString(), details: 'Work item created' }]
+    });
+  });
+
+  tasks.forEach((t, i) => {
+    const id = state.nextId++;
+    state.workItems.push({
+      id: 'TSK-' + id, numId: id, type: 'task',
+      title: t.title, description: t.desc, priority: t.priority,
+      status: 'draft', assignee: 'Eve',
+      project: state.currentProject, documentId: '',
+      created: new Date().toISOString(), updated: new Date().toISOString(),
+      comments: [], history: [{ action: 'created', time: new Date().toISOString(), details: 'Work item created' }]
+    });
+  });
+
+  // Create links
+  state.links.push(
+    { id: 'link1', source: 'TC-7', target: 'REQ-1', role: 'verifies', project: state.currentProject, created: new Date().toISOString() },
+    { id: 'link2', source: 'TC-8', target: 'REQ-2', role: 'verifies', project: state.currentProject, created: new Date().toISOString() },
+    { id: 'link3', source: 'TC-9', target: 'REQ-3', role: 'verifies', project: state.currentProject, created: new Date().toISOString() },
+    { id: 'link4', source: 'TSK-10', target: 'REQ-1', role: 'implements', project: state.currentProject, created: new Date().toISOString() },
+    { id: 'link5', source: 'TSK-11', target: 'REQ-3', role: 'implements', project: state.currentProject, created: new Date().toISOString() },
+    { id: 'link6', source: 'REQ-1', target: 'REQ-2', role: 'parent', project: state.currentProject, created: new Date().toISOString() }
+  );
+
+  // Create a document
+  state.documents.push({
+    id: 'DOC-1', title: 'System Requirements Specification', type: 'srs',
+    project: state.currentProject,
+    sections: [
+      { id: 'sec1', title: '1. Introduction', content: 'This document specifies the system-level requirements for the ReqForge platform.', workItems: ['REQ-1', 'REQ-2'] },
+      { id: 'sec2', title: '2. Security Requirements', content: 'Security requirements define the authentication, authorization, and data protection measures.', workItems: ['REQ-6'] },
+      { id: 'sec3', title: '3. Performance Requirements', content: 'Performance requirements establish response time and throughput benchmarks.', workItems: ['REQ-4'] }
+    ],
+    status: 'draft',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString()
+  });
+  state.nextDocId = 2;
+
+  // Update document references
+  ['REQ-1','REQ-2','REQ-6','REQ-4'].forEach(id => {
+    const wi = state.workItems.find(w => w.id === id);
+    if (wi) wi.documentId = 'DOC-1';
+  });
+
+  state.activity = [
+    { action: 'created', itemId: 'REQ-1', details: 'Created REQ-1: "System shall authenticate users via SSO"', time: new Date(Date.now() - 3600000).toISOString(), project: state.currentProject },
+    { action: 'linked', itemId: 'TC-7', details: 'TC-7 linked to REQ-1 (Verifies)', time: new Date(Date.now() - 1800000).toISOString(), project: state.currentProject },
+    { action: 'status_change', itemId: 'REQ-1', details: 'REQ-1: Draft → Approved', time: new Date(Date.now() - 900000).toISOString(), project: state.currentProject }
+  ];
+
+  saveState();
+}
+
+// ========================== INIT ==========================
+function init() {
+  loadState();
+  seedDemoData();
+  document.getElementById('currentProjectName').textContent = state.projects.find(p => p.id === state.currentProject)?.name || 'Unknown';
+  switchView('dashboard');
+  lucide.createIcons();
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#projectSelectorWrap')) {
+      document.getElementById('projectDropdown').classList.add('hidden');
+    }
+  });
+
+  // Type selector change handler
+  document.getElementById('wiType')?.addEventListener('change', toggleTestCaseFields);
+}
+
+init();
+</script>
+</body>
+</html>
