@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ReqForge — Requirements Management</title>
 <meta name="description" content="Professional Requirements Management PWA">
 <meta name="theme-color" content="#09090b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ReqForge">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUmVxRm9yZ2UiLCJzaG9ydF9uYW1lIjoiUmVxRm9yZ2UiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzA5MDkwYiIsInRoZW1lX2NvbG9yIjoiIzA5MDkwYiIsImljb25zIjpbXX0=">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -31,6 +35,18 @@ tailwind.config = {
 ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 * { box-sizing: border-box; }
+html { height: -webkit-fill-available; }
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
 [contenteditable]:focus { outline: 1px solid #f59e0b; border-radius: 4px; }
 .view-hidden { display: none !important; }
 .tree-children { padding-left: 1.5rem; }
@@ -43,19 +59,79 @@ tailwind.config = {
 .sidebar-item.active { background: rgba(245,158,11,0.1); color: #fbbf24; border-right: 2px solid #f59e0b; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; }
+
+/* Mobile sidebar toggle */
+#sidebar { transition: transform 0.3s ease; }
+#menuToggle { display: none; }
+#sidebarOverlay { display: none; }
+
+@media (max-width: 767px) {
+  #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    height: 100vh;
+    height: 100dvh;
+    transform: translateX(-100%);
+    padding-top: calc(env(safe-area-inset-top) + 48px);
+  }
+  #sidebar.sidebar-open { transform: translateX(0); }
+  #sidebarOverlay.sidebar-open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0,0,0,0.6);
+  }
+  #menuToggle { display: flex; }
+
+  /* Adjust header for mobile */
+  header { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  .header-search { display: none; }
+  .header-search-mobile { display: block; }
+
+  /* Stack modal grids on mobile */
+  .modal-grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Full-width modals on mobile */
+  #wiModal > div, #docModal > div, #linkModal > div {
+    max-width: 100%;
+    margin: 0 8px;
+    max-height: 90vh;
+    max-height: 90dvh;
+    border-radius: 12px;
+  }
+
+  /* Improve touch targets */
+  .sidebar-item { min-height: 44px; }
+  button, a, select, input { min-height: 44px; }
+  input[type="text"], input[type="number"], select, textarea {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* Dynamic viewport height for iOS Safari */
+@supports (height: 100dvh) {
+  body { min-height: 100dvh; }
+}
 </style>
 </head>
 <body class="bg-zinc-950 text-zinc-300 font-sans text-sm h-screen flex flex-col overflow-hidden">
 
 <!-- ===== TOP HEADER BAR ===== -->
 <header class="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-800 flex items-center h-12 px-4 gap-3 shrink-0">
+  <!-- Mobile menu toggle -->
+  <button id="menuToggle" onclick="toggleMobileSidebar()" class="items-center justify-center text-zinc-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
+    <i data-lucide="menu" class="w-5 h-5"></i>
+  </button>
   <div class="flex items-center gap-2">
     <div class="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
       <i data-lucide="shield-check" class="w-4 h-4 text-zinc-900"></i>
     </div>
     <span class="font-mono font-bold text-amber-500 text-base tracking-tight">ReqForge</span>
   </div>
-  <div class="h-5 w-px bg-zinc-700 mx-1"></div>
+  <div class="h-5 w-px bg-zinc-700 mx-1 hidden md:block"></div>
   <!-- Project Selector -->
   <div class="relative" id="projectSelectorWrap">
     <button onclick="toggleProjectDropdown()" class="flex items-center gap-1.5 text-zinc-300 hover:text-amber-400 font-mono text-xs px-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors">
@@ -66,13 +142,17 @@ tailwind.config = {
     <div id="projectDropdown" class="hidden absolute top-8 left-0 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl w-56 z-50 py-1"></div>
   </div>
   <div class="flex-1"></div>
-  <!-- Search -->
-  <div class="relative w-72">
+  <!-- Search (hidden on mobile, shown on md+) -->
+  <div class="relative w-72 hidden md:block">
     <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
     <input id="globalSearch" type="text" placeholder="Search work items..."
       class="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-9 pr-3 py-1.5 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none"
       oninput="handleGlobalSearch(this.value)">
   </div>
+  <!-- Mobile search icon -->
+  <button id="mobileSearchBtn" onclick="toggleMobileSearch()" class="md:hidden text-zinc-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
+    <i data-lucide="search" class="w-4 h-4"></i>
+  </button>
   <button onclick="showNotifications()" class="relative text-zinc-400 hover:text-amber-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
     <i data-lucide="bell" class="w-4 h-4"></i>
     <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">0</span>
@@ -80,6 +160,19 @@ tailwind.config = {
   <div id="userAvatar" class="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 font-mono font-bold text-xs" title="Not signed in"><span>?</span></div>
   <span id="storageBadge" class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-zinc-700/50 text-zinc-400 border border-zinc-600/50">Demo</span>
 </header>
+
+<!-- Mobile search bar (hidden by default) -->
+<div id="mobileSearchBar" class="hidden md:hidden bg-zinc-900 border-b border-zinc-800 px-4 py-2">
+  <div class="relative w-full">
+    <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+    <input id="globalSearchMobile" type="text" placeholder="Search work items..."
+      class="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-9 pr-3 py-2 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none"
+      oninput="handleGlobalSearch(this.value)">
+  </div>
+</div>
+
+<!-- Sidebar overlay for mobile -->
+<div id="sidebarOverlay" onclick="toggleMobileSidebar()"></div>
 
 <!-- ===== MAIN LAYOUT ===== -->
 <div class="flex flex-1 overflow-hidden">
@@ -120,7 +213,7 @@ tailwind.config = {
   <main id="mainContent" class="flex-1 overflow-y-auto">
 
     <!-- ===== DASHBOARD VIEW ===== -->
-    <div id="view-dashboard" class="p-6 space-y-6">
+    <div id="view-dashboard" class="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div class="flex items-center justify-between">
         <h1 class="font-mono font-bold text-amber-500 text-xl">Dashboard</h1>
         <button onclick="openNewWorkItemModal()" class="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-mono font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2">
@@ -155,11 +248,11 @@ tailwind.config = {
           <i data-lucide="file-plus" class="w-4 h-4"></i> New Document
         </button>
       </div>
-      <div class="flex flex-1 overflow-hidden">
+      <div class="flex flex-col sm:flex-row flex-1 overflow-hidden">
         <!-- Doc sidebar -->
-        <div class="w-64 border-r border-zinc-800 overflow-y-auto p-3 bg-zinc-900/50" id="docSidebar"></div>
+        <div class="w-full sm:w-64 border-b sm:border-b-0 sm:border-r border-zinc-800 overflow-y-auto p-3 bg-zinc-900/50 max-h-40 sm:max-h-none" id="docSidebar"></div>
         <!-- Doc editor -->
-        <div class="flex-1 overflow-y-auto p-6" id="docEditor">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6" id="docEditor">
           <div class="flex items-center justify-center h-full text-zinc-500 font-mono text-sm">
             <div class="text-center">
               <i data-lucide="file-text" class="w-12 h-12 mx-auto mb-3 text-zinc-600"></i>
@@ -172,14 +265,14 @@ tailwind.config = {
 
     <!-- ===== WORK ITEMS TABLE VIEW ===== -->
     <div id="view-workitems" class="view-hidden h-full flex flex-col">
-      <div class="flex items-center justify-between p-4 border-b border-zinc-800">
+      <div class="flex flex-wrap items-center justify-between p-4 gap-2 border-b border-zinc-800">
         <div class="flex items-center gap-3">
           <h1 class="font-mono font-bold text-amber-500 text-xl">Work Items</h1>
           <div class="flex gap-1">
             <button onclick="setWISubView('table')" class="text-xs font-mono px-2 py-1 rounded tab-active" id="tabTable">Table</button>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <select id="wiFilterType" onchange="renderWorkItems()" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-xs text-zinc-100 focus:border-amber-500 focus:outline-none">
             <option value="all">All Types</option>
             <option value="requirement">Requirements</option>
@@ -219,7 +312,7 @@ tailwind.config = {
       </div>
       <!-- Table -->
       <div class="flex-1 overflow-auto">
-        <table class="w-full text-xs">
+        <table class="w-full text-xs min-w-[640px]">
           <thead class="bg-zinc-900 sticky top-0 z-10">
             <tr class="border-b border-zinc-700">
               <th class="text-left font-mono text-zinc-400 px-4 py-3 w-24 cursor-pointer hover:text-amber-400" onclick="sortWorkItems('id')">ID <i data-lucide="arrow-up-down" class="w-3 h-3 inline"></i></th>
@@ -299,7 +392,7 @@ tailwind.config = {
     </div>
     <div class="p-5 space-y-4">
       <input type="hidden" id="wiEditId">
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="text-xs text-zinc-500 font-mono block mb-1">Type</label>
           <select id="wiType" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
@@ -332,7 +425,7 @@ tailwind.config = {
       <div id="reqFields" class="hidden space-y-4">
         <div class="border-t border-zinc-700 pt-4">
           <div class="text-[10px] font-mono text-amber-400 uppercase tracking-wider mb-3">ISO 29148 Attributes</div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="text-xs text-zinc-500 font-mono block mb-1">Requirement Type</label>
               <select id="wiReqType" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
@@ -357,7 +450,7 @@ tailwind.config = {
               </select>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-4 mt-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
             <div>
               <label class="text-xs text-zinc-500 font-mono block mb-1">Verification Method</label>
               <select id="wiVerificationMethod" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 focus:border-amber-500 focus:outline-none">
@@ -392,7 +485,7 @@ tailwind.config = {
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="text-xs text-zinc-500 font-mono block mb-1">Assignee</label>
           <input type="text" id="wiAssignee" placeholder="Name..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none">
@@ -522,6 +615,33 @@ tailwind.config = {
 
 <!-- ===== JAVASCRIPT ===== -->
 <script>
+// ========================== MOBILE / iPHONE HELPERS ==========================
+
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('sidebar-open');
+  overlay.classList.toggle('sidebar-open');
+}
+
+function toggleMobileSearch() {
+  const bar = document.getElementById('mobileSearchBar');
+  bar.classList.toggle('hidden');
+  if (!bar.classList.contains('hidden')) {
+    bar.querySelector('input').focus();
+  }
+}
+
+// Close sidebar on navigation (mobile)
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (sidebar.classList.contains('sidebar-open')) {
+    sidebar.classList.remove('sidebar-open');
+    overlay.classList.remove('sidebar-open');
+  }
+}
+
 // ========================== DATA MODEL ==========================
 // Aligned with ISO/IEC/IEEE 29148:2018
 
@@ -884,6 +1004,7 @@ function switchView(view) {
     el.classList.toggle('active', el.dataset.view === view);
   });
   refreshCurrentView();
+  closeMobileSidebar();
 }
 
 function refreshCurrentView() {
@@ -1271,7 +1392,7 @@ function openDetailFlyout(id) {
       </div>
 
       <!-- Properties -->
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="bg-zinc-800 rounded-lg p-3">
           <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Priority</div>
           <span class="text-xs font-mono text-${p.color}-400">${p.label}</span>
@@ -1294,7 +1415,7 @@ function openDetailFlyout(id) {
       <!-- ISO 29148 Requirement Attributes -->
       <div class="border border-amber-500/20 rounded-lg p-4 bg-amber-500/5">
         <div class="text-[10px] font-mono text-amber-400 uppercase tracking-wider mb-3">ISO 29148 Attributes</div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="bg-zinc-800 rounded-lg p-3">
             <div class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Req. Type</div>
             <span class="text-xs font-mono text-${(REQ_TYPES[wi.reqType]||{}).color||'zinc'}-400">${(REQ_TYPES[wi.reqType]||{}).label||'Not set'}</span>
