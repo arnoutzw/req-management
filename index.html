@@ -9,6 +9,9 @@
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUmVxRm9yZ2UiLCJzaG9ydF9uYW1lIjoiUmVxRm9yZ2UiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzA5MDkwYiIsInRoZW1lX2NvbG9yIjoiIzA5MDkwYiIsImljb25zIjpbXX0=">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
 tailwind.config = {
@@ -75,6 +78,7 @@ tailwind.config = {
     <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">0</span>
   </button>
   <div id="userAvatar" class="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 font-mono font-bold text-xs" title="Not signed in"><span>?</span></div>
+  <span id="storageBadge" class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-zinc-700/50 text-zinc-400 border border-zinc-600/50">Demo</span>
 </header>
 
 <!-- ===== MAIN LAYOUT ===== -->
@@ -634,9 +638,24 @@ let state = {
   currentDocId: null
 };
 
+// ========================== FIREBASE INIT ==========================
+const firebaseApp = firebase.initializeApp({
+  apiKey: "AIzaSyAqRWVgti-CuXzr5AkhDKmPlu7iA2MQpUg",
+  authDomain: "arnout-s-homelab.firebaseapp.com",
+  projectId: "arnout-s-homelab",
+  storageBucket: "arnout-s-homelab.firebasestorage.app",
+  messagingSenderId: "258011834485",
+  appId: "1:258011834485:web:5afb1efaa303b4dd93f03c",
+});
+const db = firebaseApp.firestore();
+const fbAuth = firebaseApp.auth();
+
 // ========================== SSO AUTH STATE ==========================
 let currentUser = null;
 let isAdmin = false;
+let useFirestore = false;
+let firestoreReady = false;
+let savePending = false;
 
 window.addEventListener('message', (event) => {
   const data = event.data;
@@ -659,7 +678,8 @@ window.addEventListener('message', (event) => {
   }
 });
 
-function onUserSignedIn(user) {
+async function onUserSignedIn(user) {
+  // Update avatar
   const avatarEl = document.getElementById('userAvatar');
   if (avatarEl) {
     if (user.photoURL) {
@@ -670,19 +690,61 @@ function onUserSignedIn(user) {
     }
     avatarEl.title = user.displayName || user.email || '';
   }
-  console.log('SSO user signed in:', user.displayName, user.email);
+
+  // Authenticate with Firebase and switch to Firestore
+  try {
+    const credential = firebase.auth.GoogleAuthProvider.credential(user.idToken);
+    await fbAuth.signInWithCredential(credential);
+    firestoreReady = true;
+    useFirestore = true;
+    console.log('SSO user signed in, Firestore active:', user.displayName, user.email);
+    await loadStateFromFirestore();
+    updateStorageBadge();
+    refreshAll();
+  } catch (err) {
+    console.warn('Firebase sign-in failed, staying in demo mode:', err.message);
+    useFirestore = false;
+    firestoreReady = false;
+    updateStorageBadge();
+  }
 }
 
-function onUserSignedOut() {
+async function onUserSignedOut() {
+  // Update avatar
   const avatarEl = document.getElementById('userAvatar');
   if (avatarEl) {
     avatarEl.innerHTML = '<span>?</span>';
     avatarEl.title = 'Not signed in';
   }
-  console.log('SSO user signed out');
+
+  // Sign out of Firebase and switch back to localStorage demo
+  useFirestore = false;
+  firestoreReady = false;
+  try { await fbAuth.signOut(); } catch {}
+  console.log('SSO user signed out, localStorage demo mode');
+
+  // Reload from localStorage
+  loadStateFromLocalStorage();
+  seedDemoData();
+  updateStorageBadge();
+  refreshAll();
 }
 
-function loadState() {
+function updateStorageBadge() {
+  const badge = document.getElementById('storageBadge');
+  if (!badge) return;
+  if (useFirestore && currentUser) {
+    badge.textContent = 'Synced';
+    badge.className = 'ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-green-500/20 text-green-400 border border-green-500/50';
+  } else {
+    badge.textContent = 'Demo';
+    badge.className = 'ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-zinc-700/50 text-zinc-400 border border-zinc-600/50';
+  }
+}
+
+// ========================== PERSISTENCE (DUAL MODE) ==========================
+
+function loadStateFromLocalStorage() {
   try {
     const saved = localStorage.getItem('reqforge_state');
     if (saved) {
@@ -697,8 +759,55 @@ function loadState() {
   } catch(e) { console.error('Load state error', e); }
 }
 
-function saveState() {
+function saveStateToLocalStorage() {
   try { localStorage.setItem('reqforge_state', JSON.stringify(state)); } catch(e) {}
+}
+
+async function loadStateFromFirestore() {
+  if (!currentUser || !firestoreReady) return;
+  try {
+    const doc = await db.collection('users').doc(currentUser.uid)
+      .collection('app_data').doc('reqforge_state').get();
+    if (doc.exists) {
+      const parsed = doc.data();
+      state = { ...state, ...parsed };
+    }
+    if (!state.projects.length) {
+      state.projects = [{ id: 'proj1', name: 'Default Project', created: new Date().toISOString() }];
+      state.currentProject = 'proj1';
+    }
+    if (!state.currentProject) state.currentProject = state.projects[0]?.id;
+    console.log('State loaded from Firestore');
+  } catch(e) { console.error('Firestore load error', e); }
+}
+
+async function saveStateToFirestore() {
+  if (!currentUser || !firestoreReady) return;
+  try {
+    await db.collection('users').doc(currentUser.uid)
+      .collection('app_data').doc('reqforge_state')
+      .set(JSON.parse(JSON.stringify(state)));
+    console.log('State saved to Firestore');
+  } catch(e) { console.error('Firestore save error', e); }
+}
+
+function loadState() {
+  loadStateFromLocalStorage();
+}
+
+function saveState() {
+  if (useFirestore && firestoreReady) {
+    saveStateToLocalStorage();
+    if (!savePending) {
+      savePending = true;
+      setTimeout(async () => {
+        savePending = false;
+        await saveStateToFirestore();
+      }, 1000);
+    }
+  } else {
+    saveStateToLocalStorage();
+  }
 }
 
 function getProjectItems() { return state.workItems.filter(wi => wi.project === state.currentProject); }
