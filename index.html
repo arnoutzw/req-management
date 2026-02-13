@@ -1793,7 +1793,6 @@ function handleGlobalSearch(query) {
     const t = TYPES[wi.type];
     const s = STATUSES[wi.status];
     const p = PRIORITIES[wi.priority];
-    return `
     const rl = wi.reqLevel ? REQ_LEVELS[wi.reqLevel] : null;
     return `
     <tr class="border-b border-zinc-800 hover:bg-zinc-900/80 cursor-pointer transition-colors" onclick="openDetailFlyout('${wi.id}')">
