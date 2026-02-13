@@ -74,7 +74,7 @@ tailwind.config = {
     <i data-lucide="bell" class="w-4 h-4"></i>
     <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">0</span>
   </button>
-  <div class="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 font-mono font-bold text-xs">A</div>
+  <div id="userAvatar" class="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 font-mono font-bold text-xs" title="Not signed in"><span>?</span></div>
 </header>
 
 <!-- ===== MAIN LAYOUT ===== -->
@@ -633,6 +633,54 @@ let state = {
   selectedWI: null,
   currentDocId: null
 };
+
+// ========================== SSO AUTH STATE ==========================
+let currentUser = null;
+let isAdmin = false;
+
+window.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || data.type !== 'admin-auth') return;
+
+  isAdmin = !!data.isAdmin;
+
+  if (data.sso) {
+    currentUser = {
+      uid: data.sso.uid,
+      email: data.sso.email,
+      displayName: data.sso.displayName,
+      photoURL: data.sso.photoURL,
+      idToken: data.sso.idToken,
+    };
+    onUserSignedIn(currentUser);
+  } else {
+    currentUser = null;
+    onUserSignedOut();
+  }
+});
+
+function onUserSignedIn(user) {
+  const avatarEl = document.getElementById('userAvatar');
+  if (avatarEl) {
+    if (user.photoURL) {
+      avatarEl.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName || ''}" style="width:28px;height:28px;border-radius:50%;border:1px solid rgba(245,158,11,0.5);">`;
+    } else {
+      const initials = (user.displayName || user.email || '?').charAt(0).toUpperCase();
+      avatarEl.innerHTML = `<span>${initials}</span>`;
+    }
+    avatarEl.title = user.displayName || user.email || '';
+  }
+  console.log('SSO user signed in:', user.displayName, user.email);
+}
+
+function onUserSignedOut() {
+  const avatarEl = document.getElementById('userAvatar');
+  if (avatarEl) {
+    avatarEl.innerHTML = '<span>?</span>';
+    avatarEl.title = 'Not signed in';
+  }
+  console.log('SSO user signed out');
+}
 
 function loadState() {
   try {
@@ -1276,7 +1324,8 @@ function addComment(wiId) {
   const wi = state.workItems.find(w => w.id === wiId);
   if (!wi) return;
   wi.comments = wi.comments || [];
-  wi.comments.push({ author: 'You', text, time: new Date().toISOString() });
+  const authorName = currentUser ? (currentUser.displayName || currentUser.email) : 'You';
+  wi.comments.push({ author: authorName, text, time: new Date().toISOString() });
   wi.updated = new Date().toISOString();
   logActivity('comment', wiId, `Commented on ${wiId}`);
   saveState();
